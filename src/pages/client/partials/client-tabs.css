@@ -1,0 +1,337 @@
+/* ============================================
+   client-tabs.css - أنماط موحدة لواجهات العميل
+   نفس فلسفة provider-tabs.css للحفاظ على التناسق
+   ============================================ */
+
+/* === الألوان الأساسية === */
+:root {
+  --primary-color: #1b2a47;
+  --secondary-color: #ff8a00;
+  --bg-color: #f8f9fa;
+  --border-radius: 15px;
+  --transition-speed: 0.3s;
+}
+
+/* === البطاقات الموحدة === */
+.card-provider {
+  background: white;
+  border-radius: var(--border-radius);
+  transition: all var(--transition-speed) ease;
+  position: relative;
+  overflow: visible;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.card-provider:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* === رأس القسم === */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.section-header h3 {
+  font-weight: 800;
+  color: var(--primary-color);
+  font-size: 28px;
+  margin: 0;
+}
+
+.section-header p {
+  color: #6c757d;
+  font-weight: 600;
+  margin: 0;
+  font-size: 17px;
+}
+
+/* === الأزرار === */
+.btn-provider-primary {
+  background-color: var(--primary-color);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 24px;
+  transition: all var(--transition-speed) ease;
+}
+.btn-provider-primary:hover {
+  background-color: #0f1e33;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(27, 42, 71, 0.3);
+}
+
+.btn-provider-orange {
+  background-color: var(--secondary-color);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 30px;
+  transition: all var(--transition-speed) ease;
+  box-shadow: 0 4px 15px rgba(255, 138, 0, 0.25);
+}
+.btn-provider-orange:hover {
+  background-color: #e67a00;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 138, 0, 0.35);
+}
+
+.btn-provider-outline {
+  background-color: white;
+  color: var(--primary-color);
+  font-weight: 700;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 20px;
+  transition: all var(--transition-speed) ease;
+}
+.btn-provider-outline:hover {
+  border-color: var(--primary-color);
+  background-color: #f8f9fa;
+}
+
+/* === Skeleton Loading === */
+.loading-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* === Toast Notifications === */
+.toast-custom {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 18px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.4s ease;
+  direction: rtl;
+}
+.toast-success { background-color: #10b981; color: white; }
+.toast-error { background-color: #ef4444; color: white; }
+.toast-info { background-color: #3b82f6; color: white; }
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-100px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+/* === Stars === */
+.stars-container {
+  display: flex;
+  gap: 3px;
+}
+.star-filled { color: #ff8a00; }
+.star-empty { color: #cbd5e1; }
+
+/* === Star Rating Input (تفاعلي) === */
+.star-rating-input {
+  display: inline-flex;
+  align-items: center;
+}
+.star-rating-icon {
+  transition: all 0.15s ease;
+}
+.star-active {
+  color: #ff8a00;
+  filter: drop-shadow(0 0 3px rgba(255, 138, 0, 0.4));
+}
+.star-inactive {
+  color: #cbd5e1;
+}
+.star-clickable:hover {
+  filter: drop-shadow(0 0 5px rgba(255, 138, 0, 0.5));
+}
+
+/* === الحالة الفارغة === */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+.empty-state svg {
+  color: #cbd5e1;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+.empty-state h4 {
+  color: var(--primary-color);
+  font-weight: 700;
+}
+.empty-state p {
+  color: #6c757d;
+  font-weight: 600;
+}
+
+/* === Progress Bar === */
+.progress-custom {
+  height: 14px;
+  background-color: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.progress-bar-custom {
+  height: 100%;
+  background: linear-gradient(90deg, var(--secondary-color), #ffb347);
+  border-radius: 10px;
+  transition: width 0.8s ease;
+}
+.progress-bar-custom.completed {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+/* === Badges === */
+.badge-pending {
+  background-color: rgba(255, 138, 0, 0.1);
+  color: var(--secondary-color);
+  padding: 8px 18px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 138, 0, 0.2);
+}
+.badge-resolved {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  padding: 8px 18px;
+  font-weight: 700;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.badge-rejected {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 8px 18px;
+  font-weight: 700;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.badge-active {
+  background-color: rgba(13, 110, 253, 0.1);
+  color: #0d6efd;
+  padding: 8px 18px;
+  font-weight: 700;
+}
+
+/* === Tabs Switcher === */
+.tab-switcher {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 35px;
+  flex-wrap: wrap;
+}
+.tab-switcher button {
+  padding: 14px 32px;
+  font-weight: 700;
+  border-radius: 40px;
+  border: 2px solid #e2e8f0;
+  background: white;
+  color: var(--primary-color);
+  font-size: 18px;
+  transition: all var(--transition-speed) ease;
+  cursor: pointer;
+}
+.tab-switcher button:hover {
+  border-color: var(--secondary-color);
+  transform: translateY(-2px);
+}
+
+/* === Form Controls === */
+.form-control-custom {
+  background-color: #f8f9fa;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 17px;
+  transition: all var(--transition-speed) ease;
+}
+.form-control-custom:focus {
+  background-color: white;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.15);
+}
+
+/* === Timeline (متابعة المشاريع) === */
+.timeline {
+  position: relative;
+  padding-right: 20px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  right: 25px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  background: linear-gradient(to bottom, var(--secondary-color), #10b981);
+  border-radius: 3px;
+}
+.timeline-item {
+  position: relative;
+  margin-bottom: 30px;
+  padding-right: 50px;
+}
+.timeline-dot {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  z-index: 2;
+  border: 3px solid white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+.timeline-dot.completed {
+  background-color: #10b981;
+  color: white;
+}
+.timeline-dot.in-progress {
+  background-color: var(--secondary-color);
+  color: white;
+}
+.timeline-dot.pending {
+  background-color: #cbd5e1;
+  color: white;
+}
+
+/* === Stars === */
+.stars-container {
+  display: flex;
+  gap: 3px;
+}
+.star-filled { color: #ff8a00; }
+.star-empty { color: #cbd5e1; }
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .section-header h3 { font-size: 22px; }
+  .section-header { flex-direction: column; align-items: flex-start; }
+  .tab-switcher button { font-size: 15px; padding: 10px 20px; }
+}
+

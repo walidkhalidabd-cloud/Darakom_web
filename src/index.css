@@ -1,0 +1,21 @@
+/* إعدادات الألوان الأساسية لمنصة داركم */
+:root {
+  --primary-color: #1A2A44; /* الكحلي الداكن */
+  --secondary-color: #F58A1E; /* البرتقالي الحيوي */
+  --bg-color: #F5F7FA; /* الرمادي الفاتح للخلفية */
+  --white-color: #ffffff;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Tajawal', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--primary-color);
+}
+
+/* إزالة الخطوط السفلية المزعجة من الروابط */
+a {
+  text-decoration: none;
+  color: inherit;
+}
