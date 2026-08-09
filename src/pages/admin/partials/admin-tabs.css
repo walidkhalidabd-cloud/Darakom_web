@@ -1,0 +1,207 @@
+/* ============================================
+   admin-tabs.css - أنماط موحدة للوحة الإدارة
+   ============================================ */
+
+:root {
+  --admin-primary: #1b2a47;
+  --admin-secondary: #ff8a00;
+  --admin-bg: #f4f6f9;
+}
+
+/* === بطاقات الإحصائيات === */
+.admin-stat-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  border-bottom: 4px solid transparent;
+}
+.admin-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* === رأس الأقسام === */
+.admin-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.admin-section-header h3 {
+  font-weight: 800;
+  color: var(--admin-primary);
+  font-size: 28px;
+  margin: 0;
+}
+.admin-section-header p {
+  color: #6c757d;
+  font-weight: 600;
+  margin: 0;
+  font-size: 17px;
+}
+
+/* === أزرار === */
+.btn-admin-primary {
+  background-color: var(--admin-primary);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 24px;
+  transition: all 0.3s ease;
+}
+.btn-admin-primary:hover {
+  background-color: #0f1e33;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(27, 42, 71, 0.3);
+}
+
+.btn-admin-orange {
+  background-color: var(--admin-secondary);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 30px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 138, 0, 0.25);
+}
+.btn-admin-orange:hover {
+  background-color: #e67a00;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 138, 0, 0.35);
+}
+
+/* === Badges الحالة === */
+.admin-badge {
+  padding: 8px 18px;
+  font-weight: 700;
+  border-radius: 40px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-badge-pending {
+  background-color: rgba(255, 138, 0, 0.1);
+  color: var(--admin-secondary);
+  border: 1px solid rgba(255, 138, 0, 0.2);
+}
+.admin-badge-approved {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.admin-badge-rejected {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.admin-badge-active {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.admin-badge-blocked {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* === جدول الإدارة === */
+.admin-table thead th {
+  background-color: var(--admin-primary);
+  color: white;
+  font-weight: 700;
+  font-size: 17px;
+  padding: 14px 16px;
+  border: none;
+  white-space: nowrap;
+}
+.admin-table tbody td {
+  padding: 14px 16px;
+  font-weight: 600;
+  font-size: 16px;
+  vertical-align: middle;
+  border-color: #eef0f3;
+}
+.admin-table tbody tr {
+  transition: background 0.2s;
+}
+.admin-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* === حقول النماذج === */
+.form-control-admin {
+  background-color: #f8f9fa;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 17px;
+  transition: all 0.3s ease;
+}
+.form-control-admin:focus {
+  background-color: white;
+  border-color: var(--admin-secondary);
+  box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.15);
+}
+
+/* === حالة فارغة === */
+.admin-empty {
+  text-align: center;
+  padding: 50px 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+.admin-empty svg {
+  color: #cbd5e1;
+  margin-bottom: 15px;
+  opacity: 0.5;
+}
+.admin-empty h5 {
+  color: var(--admin-primary);
+  font-weight: 700;
+}
+.admin-empty p {
+  color: #6c757d;
+  font-weight: 600;
+}
+
+/* === Toast === */
+.toast-custom {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 18px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.4s ease;
+  direction: rtl;
+}
+.toast-success { background-color: #10b981; color: white; }
+.toast-error { background-color: #ef4444; color: white; }
+.toast-info { background-color: #3b82f6; color: white; }
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-100px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .admin-section-header h3 { font-size: 22px; }
+  .admin-section-header { flex-direction: column; align-items: flex-start; }
+}
