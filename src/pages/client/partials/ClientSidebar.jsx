@@ -2,10 +2,18 @@
 import { 
     FaHome, FaPlusSquare, FaListAlt, 
     FaHeart, FaBell, FaExclamationTriangle, FaStar, FaUserEdit,
-    FaFileInvoiceDollar, FaHardHat
+    FaFileInvoiceDollar, FaHardHat, FaSignOutAlt
 } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import { clearAuth } from '../../../services/auth';
 
 const ClientSidebar = ({ activeTab, setActiveTab, setDirectProvider }) => {
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        clearAuth();
+        navigate('/login');
+    };
 
     // القائمة الجانبية بعد دمج "مشاريعي" و"متابعة سير المشروع"
     const menuItems = [
@@ -43,10 +51,22 @@ const ClientSidebar = ({ activeTab, setActiveTab, setDirectProvider }) => {
                             if(item.id === 'add-project') setDirectProvider(null); 
                         }}
                     >
-                        <span className="fs-5">{item.icon}</span>
+<span className="fs-5">{item.icon}</span>
                         <span className="d-none d-md-inline">{item.name}</span>
                     </button>
                 ))}
+            </div>
+
+            {/* زر تسجيل الخروج أسفل القائمة الجانبية */}
+            <div className="p-3 border-top border-secondary">
+                <button 
+                    className="btn text-start d-flex align-items-center gap-3 p-3 w-100 rounded-3 border-0 fw-bold text-danger bg-transparent"
+                    style={{ transition: '0.3s', fontSize: '18px' }}
+                    onClick={handleLogout}
+                >
+                    <span className="fs-5"><FaSignOutAlt /></span>
+                    <span className="d-none d-md-inline">تسجيل الخروج</span>
+                </button>
             </div>
         </div>
     );

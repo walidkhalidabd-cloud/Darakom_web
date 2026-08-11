@@ -72,11 +72,11 @@ const ProviderProfileTab = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    try {
+try {
       await updateProfile({ ...profileData, past_projects: projects });
       showToast('success', '✅ تم حفظ التعديلات بنجاح!');
       setIsEditing(false);
-    } catch (err) {
+    } catch {
       showToast('success', '✅ تم حفظ التعديلات بنجاح!');
       setIsEditing(false);
     } finally { setSaving(false); }

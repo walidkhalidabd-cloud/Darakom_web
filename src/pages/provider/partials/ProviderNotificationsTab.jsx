@@ -39,10 +39,10 @@ const ProviderNotificationsTab = () => {
     load();
   }, []);
 
-  const markAllAsRead = async () => {
+const markAllAsRead = async () => {
     try {
       await markAllNotificationsRead();
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
     setNotifications(notifications.map(n => ({ ...n, is_read: true })));
     showToast('success', '✅ تم تحديد الكل كمقروء');
   };
@@ -50,7 +50,7 @@ const ProviderNotificationsTab = () => {
   const markAsRead = async (id) => {
     try {
       await markNotificationRead(id);
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
     setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
   };
 
@@ -58,7 +58,7 @@ const ProviderNotificationsTab = () => {
     e.stopPropagation();
     try {
       await deleteNotification(id);
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
     setNotifications(notifications.filter(n => n.id !== id));
     showToast('info', '🗑️ تم حذف الإشعار');
   };

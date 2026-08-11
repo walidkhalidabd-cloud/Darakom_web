@@ -1,4 +1,4 @@
-import { FaHardHat, FaStar, FaSearchDollar, FaSpinner, FaArrowLeft, FaUserTie, FaCheckCircle } from 'react-icons/fa';
+import { FaStar, FaSearchDollar, FaSpinner, FaArrowLeft, FaUserTie, FaCheckCircle } from 'react-icons/fa';
 
 const ProviderDashboardTab = ({ setActiveTab }) => {
     return (

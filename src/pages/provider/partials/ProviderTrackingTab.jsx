@@ -42,9 +42,9 @@ const ProviderTrackingTab = () => {
     setSelectedProject(project);
     setView('details');
     try {
-      const res = await fetchProjectDetails(project.id);
+const res = await fetchProjectDetails(project.id);
       setSelectedProjectDetails(res.data?.data);
-    } catch (err) {
+    } catch {
       // Fallback stages
       const stagesData = {
         1: [
@@ -73,9 +73,9 @@ const ProviderTrackingTab = () => {
     e.preventDefault();
     if (!newStageName || !selectedProject) return;
     setSaving(true);
-    try {
+try {
       await addStage(selectedProject.id, { name: newStageName, description: newStageDesc });
-    } catch (err) { /* ignore */ }
+    } catch { /* ignore */ }
     showToast('success', `✅ تم إضافة المرحلة "${newStageName}" بنجاح!`);
     setNewStageName('');
     setNewStageDesc('');

@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { FaMoneyBillWave, FaUserTie, FaRegClock, FaFileContract, FaCheckCircle, FaSpinner, FaTruck, FaStar, FaArrowRight, FaPlus, FaExclamationTriangle, FaCheck, FaImage, FaHourglassHalf, FaEdit, FaTrash, FaSave, FaTimes, FaMapMarkerAlt, FaBuilding, FaCalendarAlt, FaEye, FaTimesCircle, FaHardHat } from 'react-icons/fa';
+import { FaMoneyBillWave, FaUserTie, FaRegClock, FaFileContract, FaCheckCircle, FaSpinner, FaTruck, FaStar, FaArrowRight, FaPlus, FaExclamationTriangle, FaCheck, FaHourglassHalf, FaEdit, FaTrash, FaSave, FaTimes, FaMapMarkerAlt, FaBuilding, FaCalendarAlt, FaEye, FaTimesCircle, FaHardHat, FaPaperPlane } from 'react-icons/fa';
 import OfferDetails from './OfferDetails';
+import ProjectRatingForm from '../../../components/ProjectRatingForm';
+import ImageUploader from '../../../components/ImageUploader';
 
 const OffersTab = () => {
     const [offerStatus, setOfferStatus] = useState('pending');
-    // tracking: 'list' | 'details' | 'complaint' | 'edit' | 'view-offers' | 'offer-detail'
+    // tracking: 'list' | 'details' | 'complaint' | 'edit' | 'view-offers' | 'offer-detail' | 'rate'
     const [trackingView, setTrackingView] = useState('list');
     const [selectedProject, setSelectedProject] = useState(null);
     const [selectedOffer, setSelectedOffer] = useState(null);
-    const [complaintDocs, setComplaintDocs] = useState([]);
+    const [complaintImages, setComplaintImages] = useState([]);
     const [editForm, setEditForm] = useState({
         title: '', description: '', governorate: '', area: '', providerType: '', tenderDays: ''
     });
@@ -208,11 +210,7 @@ const OffersTab = () => {
         : offerStatus === 'ongoing' ? ongoingOffers 
         : completedOffers;
 
-    const addComplaintDocRow = () => setComplaintDocs([...complaintDocs, { id: Date.now(), type: '', title: '', file: null }]);
-    const handleComplaintDocChange = (id, field, value) => setComplaintDocs(complaintDocs.map(doc => doc.id === id ? { ...doc, [field]: value } : doc));
-    const removeComplaintDocRow = (id) => setComplaintDocs(complaintDocs.filter(doc => doc.id !== id));
-
-    const startEdit = (project) => {
+const startEdit = (project) => {
         setEditForm({
             title: project.projectTitle,
             description: project.description || project.details,
@@ -529,11 +527,11 @@ const OffersTab = () => {
                     </>
                 )}
                 <div className="d-flex justify-content-center gap-3 mt-5 pt-4 border-top flex-wrap">
-                    {selectedProject.progress === 100 && (
+{selectedProject.progress === 100 && (
                         <button 
                             className="btn fw-bold px-5 py-3 rounded-pill text-white d-flex align-items-center gap-2" 
                             style={{ backgroundColor: '#ff8a00', fontSize: '20px' }}
-                            onClick={() => alert(`سيتم نقلك لصفحة التقييم الخاصة بـ ${selectedProject.providerName}`)}
+                            onClick={() => setTrackingView('rate')}
                         >
                             <FaStar /> تقييم المشروع
                         </button>
@@ -552,7 +550,17 @@ const OffersTab = () => {
         );
     }
 
-    // نموذج تقديم شكوى
+// واجهة تقييم المشروع (نجوم + تعليق لمزود الخدمة)
+    if (trackingView === 'rate' && selectedProject) {
+        return (
+            <ProjectRatingForm
+                project={selectedProject}
+                onBack={() => setTrackingView('details')}
+            />
+        );
+    }
+
+// نموذج تقديم شكوى
     if (trackingView === 'complaint' && selectedProject) {
         return (
             <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mx-auto" style={{ maxWidth: '100%' }}>
@@ -567,37 +575,30 @@ const OffersTab = () => {
                     <h3 className="fw-bold" style={{ color: '#1b2a47' }}>نموذج تقديم شكوى</h3>
                     <p className="text-muted fw-semibold">{selectedProject.projectTitle} - {selectedProject.providerName}</p>
                 </div>
-                <form onSubmit={(e) => { e.preventDefault(); alert('تم إرسال الشكوى!'); setTrackingView('list'); setComplaintDocs([]); setSelectedProject(null); }}>
+<form onSubmit={(e) => { e.preventDefault(); alert('تم إرسال الشكوى!'); setTrackingView('list'); setComplaintImages([]); setSelectedProject(null); }}>
+                    <div className="row g-4 mb-4">
+                        <div className="col-md-6">
+                            <label className="fw-bold mb-2 text-muted">اسم مزود الخدمة</label>
+                            <input type="text" className="form-control p-3 bg-light" placeholder="أدخل اسم مزود الخدمة" defaultValue={selectedProject.providerName || ''} />
+                        </div>
+                        <div className="col-md-6">
+                            <label className="fw-bold mb-2 text-muted">المشروع المرتبط</label>
+                            <input type="text" className="form-control p-3 bg-light" placeholder="أدخل اسم المشروع" defaultValue={selectedProject.projectTitle || ''} />
+                        </div>
+                    </div>
                     <div className="mb-4">
                         <label className="fw-bold mb-2 text-muted">وصف المشكلة</label>
                         <textarea className="form-control p-4 bg-light" rows="5" placeholder="اكتب وصفاً تفصيلياً للمشكلة..." required></textarea>
                     </div>
                     <div className="mb-4">
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <label className="fw-bold text-muted mb-0">المرفقات (اختياري)</label>
-                            <button type="button" className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1" onClick={addComplaintDocRow}>
-                                <FaPlus /> إضافة مرفق
-                            </button>
-                        </div>
-                        {complaintDocs.map(doc => (
-                            <div key={doc.id} className="row g-2 mb-2 p-3 bg-light rounded-3">
-                                <div className="col-md-4">
-                                    <input type="text" className="form-control" placeholder="نوع المرفق" value={doc.type} onChange={(e) => handleComplaintDocChange(doc.id, 'type', e.target.value)} />
-                                </div>
-                                <div className="col-md-4">
-                                    <input type="text" className="form-control" placeholder="عنوان المرفق" value={doc.title} onChange={(e) => handleComplaintDocChange(doc.id, 'title', e.target.value)} />
-                                </div>
-                                <div className="col-md-3">
-                                    <input type="file" className="form-control" onChange={(e) => handleComplaintDocChange(doc.id, 'file', e.target.files[0])} />
-                                </div>
-                                <div className="col-md-1 d-flex align-items-center">
-                                    <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => removeComplaintDocRow(doc.id)}><FaImage /> حذف</button>
-                                </div>
-                            </div>
-                        ))}
+                        <ImageUploader 
+                            images={complaintImages} 
+                            onChange={setComplaintImages} 
+                            label="صور المشكلة"
+                        />
                     </div>
-                    <button type="submit" className="btn w-100 fw-bold py-3 btn-danger fs-4 rounded-pill shadow-sm">
-                        إرسال الشكوى
+                    <button type="submit" className="btn w-100 fw-bold py-3 btn-danger fs-4 rounded-pill shadow-sm d-flex align-items-center justify-content-center gap-2">
+                        <FaPaperPlane /> إرسال الشكوى
                     </button>
                 </form>
             </div>

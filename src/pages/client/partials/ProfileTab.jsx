@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { FaUserEdit, FaStar, FaListAlt, FaShieldAlt, FaSpinner, FaSave } from 'react-icons/fa';
+import { FaUserEdit, FaStar, FaListAlt, FaShieldAlt, FaSpinner, FaSave, FaSignOutAlt } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import { fetchClientProfile, updateClientProfile } from '../../../services/api/clientApi';
+import { clearAuth } from '../../../services/auth';
 import './client-tabs.css';
 
 const ProfileTab = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -30,9 +33,9 @@ const ProfileTab = () => {
           email: data.email || 'ahmed.s@example.com',
           phone: data.phone || '0999123456',
           address: data.address || 'دمشق',
-          bio: data.bio || 'مهتم بتطوير العقارات وبناء مشاريع سكنية حديثة.'
+bio: data.bio || 'مهتم بتطوير العقارات وبناء مشاريع سكنية حديثة.'
         });
-      } catch (err) {
+      } catch {
         setFormData({
           first_name: 'أحمد', last_name: 'سليمان', email: 'ahmed.s@example.com',
           phone: '0999123456', address: 'دمشق',
@@ -49,14 +52,19 @@ const ProfileTab = () => {
     try {
       await updateClientProfile(formData);
       showToast('success', '✅ تم حفظ التغييرات بنجاح!');
-    } catch (err) {
+    } catch {
       showToast('success', '✅ تم حفظ التغييرات بنجاح!');
     } finally { setSaving(false); }
   };
 
-  const showToast = (type, message) => {
+const showToast = (type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    navigate('/login');
   };
 
   if (loading) {
@@ -97,12 +105,20 @@ const ProfileTab = () => {
                 <h4 className="fw-bold text-dark mb-1">5</h4>
                 <span className="text-muted small fw-bold">مشاريع مطروحة</span>
               </div>
-              <div className="bg-light p-3 rounded-4 text-center w-50 border">
+<div className="bg-light p-3 rounded-4 text-center w-50 border">
                 <div className="text-warning mb-1"><FaStar size={24} /></div>
                 <h4 className="fw-bold text-dark mb-1">4.8</h4>
                 <span className="text-muted small fw-bold">متوسط التقييم</span>
               </div>
             </div>
+            {/* زر تسجيل الخروج من الملف الشخصي */}
+            <button 
+              className="btn btn-outline-danger fw-bold rounded-pill px-4 py-2 mt-4 d-inline-flex align-items-center gap-2 shadow-sm"
+              style={{ fontSize: '17px' }}
+              onClick={handleLogout}
+            >
+              <FaSignOutAlt /> تسجيل الخروج
+            </button>
           </div>
 
           <div className="col-lg-8">
@@ -153,4 +169,3 @@ const ProfileTab = () => {
 };
 
 export default ProfileTab;
-

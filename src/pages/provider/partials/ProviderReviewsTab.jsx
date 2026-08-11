@@ -23,9 +23,9 @@ const ProviderReviewsTab = () => {
           fetchReceivedReviews(),
           fetchGivenReviews()
         ]);
-        if (recRes.value?.data?.data) setReceived(recRes.value.data.data);
+if (recRes.value?.data?.data) setReceived(recRes.value.data.data);
         if (givRes.value?.data?.data) setGiven(givRes.value.data.data);
-      } catch (err) { /* ignore */ }
+      } catch { /* ignore */ }
 
       // Fallback data
       if (received.length === 0 && given.length === 0) {

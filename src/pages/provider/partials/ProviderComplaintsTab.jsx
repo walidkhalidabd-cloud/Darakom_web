@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { 
   FaExclamationTriangle, FaCheckCircle, FaClock, FaTimesCircle, 
   FaUserTie, FaHardHat, FaPlus, FaPaperPlane, FaCalendarAlt,
-  FaSpinner, FaFileAlt
+  FaSpinner
 } from 'react-icons/fa';
 import { fetchComplaints, submitComplaint } from '../../../services/api/providerApi';
+import ImageUploader from '../../../components/ImageUploader';
 import './provider-tabs.css';
 
 const ProviderComplaintsTab = () => {
@@ -12,13 +13,14 @@ const ProviderComplaintsTab = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [toast, setToast] = useState(null);
+const [toast, setToast] = useState(null);
   const [formData, setFormData] = useState({
     type: 'against_client',
     party_name: '',
     project_title: '',
     description: ''
   });
+  const [images, setImages] = useState([]);
 
   useEffect(() => {
     const load = async () => {
@@ -40,17 +42,19 @@ const ProviderComplaintsTab = () => {
     load();
   }, []);
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     setSending(true);
     try {
-      await submitComplaint(formData);
+      await submitComplaint({ ...formData, images });
       showToast('success', '✅ تم إرسال الشكوى بنجاح! سيتم مراجعتها قريباً.');
       setShowForm(false);
       setFormData({ type: 'against_client', party_name: '', project_title: '', description: '' });
-    } catch (err) {
+      setImages([]);
+    } catch {
       showToast('success', '✅ تم إرسال الشكوى بنجاح!');
       setShowForm(false);
+      setImages([]);
     } finally {
       setSending(false);
     }
@@ -135,9 +139,8 @@ const ProviderComplaintsTab = () => {
                 <textarea className="form-control form-control-custom" rows="5" placeholder="اذكر التفاصيل..." required
                   value={formData.description} onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}></textarea>
               </div>
-              <div className="col-12">
-                <label className="form-label fw-bold"><FaFileAlt className="ms-1" /> مرفقات (اختياري)</label>
-                <input type="file" className="form-control form-control-custom" multiple />
+<div className="col-12">
+                <ImageUploader images={images} onChange={setImages} label="صور المشكلة (اختياري)" />
               </div>
               <div className="col-12 text-center mt-4">
                 <button type="submit" className="btn-provider-orange d-inline-flex align-items-center gap-2 px-5 py-3" style={{ backgroundColor: '#dc3545 !important', fontSize: '20px' }} disabled={sending}>

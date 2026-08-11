@@ -3,17 +3,22 @@ import {
   FaArrowRight, FaCheck, FaSpinner, FaHardHat, FaMapMarkerAlt, 
   FaUserTie, FaCalendarAlt, FaProjectDiagram,
   FaCheckDouble, FaEye, FaExclamationTriangle, FaStar,
-  FaPercentage, FaHourglassHalf, FaCheckCircle
+  FaPercentage, FaHourglassHalf, FaCheckCircle, FaPaperPlane
 } from 'react-icons/fa';
-import { fetchClientOngoingProjects, fetchClientProjectTracking } from '../../../services/api/clientApi';
+import { fetchClientOngoingProjects, fetchClientProjectTracking, submitClientComplaint } from '../../../services/api/clientApi';
+import ProjectRatingForm from '../../../components/ProjectRatingForm';
+import ImageUploader from '../../../components/ImageUploader';
 
 const TrackingTab = ({ setActiveTab }) => {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState(null);
-  const [view, setView] = useState('list'); // 'list' | 'details' | 'complaint'
-  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('list'); // 'list' | 'details' | 'complaint' | 'rate'
+const [loading, setLoading] = useState(true);
   const [complaintText, setComplaintText] = useState('');
+  const [complaintProvider, setComplaintProvider] = useState('');
+  const [complaintProject, setComplaintProject] = useState('');
+  const [complaintImages, setComplaintImages] = useState([]);
 
   // تحميل المشاريع قيد التنفيذ والمكتملة
   useEffect(() => {
@@ -57,9 +62,9 @@ const TrackingTab = ({ setActiveTab }) => {
     setSelectedProject(project);
     setView('details');
     try {
-      const res = await fetchClientProjectTracking(project.id);
+const res = await fetchClientProjectTracking(project.id);
       setSelectedProjectDetails(res.data?.data);
-    } catch (err) {
+    } catch {
       // بيانات وهمية للمراحل حسب المشروع
       const stagesData = {
         1: [
@@ -84,15 +89,28 @@ const TrackingTab = ({ setActiveTab }) => {
     }
   };
 
-  // تقديم شكوى
-  const handleSubmitComplaint = (e) => {
+// تقديم شكوى
+  const handleSubmitComplaint = async (e) => {
     e.preventDefault();
     if (!complaintText.trim()) return;
+    try {
+      await submitClientComplaint({
+        providerName: complaintProvider || selectedProject?.provider,
+        projectTitle: complaintProject || selectedProject?.title,
+        description: complaintText,
+        images: complaintImages
+      });
+    } catch (err) {
+      console.warn('⚠️ API غير متاح:', err.message);
+    }
     alert(`✅ تم إرسال شكواك بخصوص المشروع "${selectedProject.title}" إلى إدارة المنصة. سيتم مراجعتها والرد عليك قريباً.`);
     setView('list');
     setSelectedProject(null);
     setSelectedProjectDetails(null);
     setComplaintText('');
+    setComplaintProvider('');
+    setComplaintProject('');
+    setComplaintImages([]);
   };
 
   if (loading) {
@@ -360,11 +378,11 @@ const TrackingTab = ({ setActiveTab }) => {
 
           {/* أزرار الإجراءات */}
           <div className="d-flex justify-content-center gap-3 mt-5 pt-4 border-top flex-wrap">
-            {selectedProject.progress === 100 && (
+{selectedProject.progress === 100 && (
               <button 
                 className="btn fw-bold px-5 py-3 rounded-pill shadow-sm text-white d-flex align-items-center gap-2"
                 style={{ backgroundColor: '#ff8a00', fontSize: '18px' }}
-                onClick={() => { setActiveTab('reviews'); }}
+                onClick={() => setView('rate')}
               >
                 <FaStar /> تقييم المشروع
               </button>
@@ -387,6 +405,14 @@ const TrackingTab = ({ setActiveTab }) => {
             </button>
           </div>
         </div>
+      )}
+
+{/* ================ واجهة تقييم المشروع (نجوم + تعليق) ================ */}
+      {view === 'rate' && selectedProject && (
+        <ProjectRatingForm
+          project={selectedProject}
+          onBack={() => { setView('details'); setSelectedProjectDetails(null); }}
+        />
       )}
 
       {/* ================ نموذج تقديم شكوى ================ */}
@@ -412,7 +438,32 @@ const TrackingTab = ({ setActiveTab }) => {
             </p>
           </div>
 
-          <form onSubmit={handleSubmitComplaint}>
+<form onSubmit={handleSubmitComplaint}>
+            <div className="row g-4 mb-4">
+              <div className="col-md-6">
+                <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>اسم مزود الخدمة</label>
+                <input 
+                  type="text" 
+                  className="form-control p-3 bg-light border" 
+                  placeholder="أدخل اسم مزود الخدمة"
+                  style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}
+                  value={complaintProvider}
+                  onChange={(e) => setComplaintProvider(e.target.value)}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>المشروع المرتبط</label>
+                <input 
+                  type="text" 
+                  className="form-control p-3 bg-light border" 
+                  placeholder="أدخل اسم المشروع"
+                  style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}
+                  value={complaintProject}
+                  onChange={(e) => setComplaintProject(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="mb-4">
               <label className="form-label fw-bold fs-5 mb-3" style={{ color: '#1b2a47' }}>وصف المشكلة بالتفصيل</label>
               <textarea 
@@ -426,6 +477,14 @@ const TrackingTab = ({ setActiveTab }) => {
               ></textarea>
             </div>
 
+            <div className="mb-4">
+              <ImageUploader 
+                images={complaintImages} 
+                onChange={setComplaintImages} 
+                label="صور المشكلة"
+              />
+            </div>
+
             <div className="alert alert-warning rounded-4 p-4 mb-4 d-flex align-items-center gap-3">
               <FaExclamationTriangle className="fs-3 flex-shrink-0" />
               <div>
@@ -435,8 +494,8 @@ const TrackingTab = ({ setActiveTab }) => {
             </div>
 
             <div className="d-flex justify-content-center gap-3 flex-wrap">
-              <button type="submit" className="btn btn-danger fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2" style={{ fontSize: '20px' }}>
-                <FaExclamationTriangle /> إرسال الشكوى
+<button type="submit" className="btn btn-danger fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2" style={{ fontSize: '20px' }}>
+                <FaPaperPlane /> إرسال الشكوى
               </button>
               <button 
                 type="button" 
