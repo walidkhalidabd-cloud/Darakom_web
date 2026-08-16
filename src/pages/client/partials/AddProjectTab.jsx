@@ -47,10 +47,18 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
                         <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>اسم المشروع</label>
                         <input type="text" className="form-control p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} placeholder="أدخل اسم المشروع" required />
                     </div>
+                    
                     <div className="col-12">
                         <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>وصف المشروع بدقة</label>
                         <textarea className="form-control p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} rows="5" required></textarea>
                     </div>
+
+                    {/* الحقل الجديد: العنوان بالتفصيل */}
+                    <div className="col-12">
+                        <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>العنوان بالتفصيل</label>
+                        <input type="text" className="form-control p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} placeholder="أدخل العنوان بالتفصيل (مثل: الحي، الشارع، أقرب معلم)" required />
+                    </div>
+
                     <div className="col-md-6">
                         <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>المحافظة</label>
                         <select className="form-select p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} required>
@@ -71,6 +79,7 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
                             <option value="القنيطرة">القنيطرة</option>
                         </select>
                     </div>
+                    
                     <div className="col-md-6">
                         <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>المساحة</label>
                         <div className="input-group">

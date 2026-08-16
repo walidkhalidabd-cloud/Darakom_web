@@ -7,20 +7,22 @@ import DashboardTab from './partials/DashboardTab';
 import FavoritesTab from './partials/FavoritesTab';
 import AddProjectTab from './partials/AddProjectTab';
 import OffersTab from './partials/OffersTab';
-import OffersReceivedTab from './partials/OffersReceivedTab'; // <--- واجهة العروض الجديدة
+import OffersReceivedTab from './partials/OffersReceivedTab'; 
 import NotificationsTab from './partials/NotificationsTab'; 
 import ComplaintsTab from './partials/ComplaintsTab';
 import ReviewsTab from './partials/ReviewsTab'; 
-import ProfileTab from './partials/ProfileTab'; // <--- استدعاء واجهة الملف الشخصي الأخيرة!
-import TrackingTab from './partials/TrackingTab'; // <--- واجهة متابعة سير المشاريع
+import ProfileTab from './partials/ProfileTab'; 
+import TrackingTab from './partials/TrackingTab'; 
 
 const ClientDashboard = () => {
-    // الواجهة الافتراضية للوحة تحكم العميل
     const [activeTab, setActiveTab] = useState('dashboard'); 
     
     // متغيرات إضافة مشروع 
     const [projectType, setProjectType] = useState('construction');
     const [directProvider, setDirectProvider] = useState(null);
+
+    // متغير جديد: لحفظ المشروع المراد متابعته عند الانتقال من واجهة مشاريعي
+    const [targetTrackingProject, setTargetTrackingProject] = useState(null);
 
     const handleDirectOffer = (provider) => {
         const constructionTypes = ['مكتب هندسي', 'مهندس معماري', 'مهندس مدني', 'مهندس استشاري', 'مقاول بناء', 'مكاتب هندسية وشركات'];
@@ -45,22 +47,16 @@ const ClientDashboard = () => {
         <div className="container-fluid p-0" style={{ fontFamily: "'Tajawal', sans-serif", backgroundColor: '#f4f6f9', minHeight: '100vh' }}>
             <div className="row g-0 flex-nowrap" style={{ minHeight: '100vh' }}>
                 
-                {/* القائمة الجانبية */}
                 <ClientSidebar 
                     activeTab={activeTab} 
                     setActiveTab={setActiveTab} 
                     setDirectProvider={setDirectProvider} 
                 />
 
-                {/* منطقة المحتوى */}
                 <div className="col overflow-auto" style={{ height: '100vh' }}>
-                    
-                    {/* الشريط العلوي */}
                     <ClientTopbar activeTabName={getTabName()} setActiveTab={setActiveTab} />
 
                     <div className="p-4 p-md-5">
-
-                        {/* ================= نظام التوجيه الداخلي (Router) السلس والمكتمل ================= */}
                         
                         {activeTab === 'dashboard' && <DashboardTab setActiveTab={setActiveTab} />}
                         {activeTab === 'favorites' && <FavoritesTab handleDirectOffer={handleDirectOffer} />}
@@ -75,20 +71,28 @@ const ClientDashboard = () => {
                             />
                         )}
 
-                        {activeTab === 'offers' && <OffersTab />}
+                        {/* تعديل: تمرير setActiveTab و setTargetTrackingProject */}
+                        {activeTab === 'offers' && (
+                            <OffersTab 
+                                setActiveTab={setActiveTab} 
+                                setTargetTrackingProject={setTargetTrackingProject} 
+                            />
+                        )}
                         
-                        {/* العروض العامة والخاصة */}
                         {(activeTab === 'offers-public' || activeTab === 'offers-private') && <OffersReceivedTab />}
-                        
                         {activeTab === 'notifications' && <NotificationsTab />}
                         {activeTab === 'complaints' && <ComplaintsTab />}
                         {activeTab === 'reviews' && <ReviewsTab />}
-                        
-                        {/* الواجهة الأخيرة: الملف الشخصي */}
                         {activeTab === 'profile' && <ProfileTab />}
                         
-                        {/* واجهة متابعة سير المشاريع */}
-                        {activeTab === 'tracking' && <TrackingTab setActiveTab={setActiveTab} />}
+                        {/* تعديل: تمرير المشروع المستهدف إلى واجهة المتابعة */}
+                        {activeTab === 'tracking' && (
+                            <TrackingTab 
+                                setActiveTab={setActiveTab} 
+                                targetProject={targetTrackingProject}
+                                setTargetProject={setTargetTrackingProject}
+                            />
+                        )}
                         
                     </div>
                 </div>

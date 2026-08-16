@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   FaArrowRight, FaCheck, FaSpinner, FaHardHat, FaMapMarkerAlt, 
   FaUserTie, FaCalendarAlt, FaProjectDiagram,
@@ -7,18 +7,14 @@ import {
 } from 'react-icons/fa';
 import { fetchClientOngoingProjects, fetchClientProjectTracking, submitClientComplaint } from '../../../services/api/clientApi';
 import ProjectRatingForm from '../../../components/ProjectRatingForm';
-import ImageUploader from '../../../components/ImageUploader';
 
-const TrackingTab = ({ setActiveTab }) => {
+const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState(null);
   const [view, setView] = useState('list'); // 'list' | 'details' | 'complaint' | 'rate'
-const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [complaintText, setComplaintText] = useState('');
-  const [complaintProvider, setComplaintProvider] = useState('');
-  const [complaintProject, setComplaintProject] = useState('');
-  const [complaintImages, setComplaintImages] = useState([]);
 
   // تحميل المشاريع قيد التنفيذ والمكتملة
   useEffect(() => {
@@ -57,12 +53,12 @@ const [loading, setLoading] = useState(true);
     loadProjects();
   }, []);
 
-  // جلب تفاصيل المشروع (المراحل)
-  const handleViewProject = async (project) => {
+  // جلب تفاصيل المشروع (المراحل) مع استخدام useCallback لتجنب أخطاء الاعتماديات
+  const handleViewProject = useCallback(async (project) => {
     setSelectedProject(project);
     setView('details');
     try {
-const res = await fetchClientProjectTracking(project.id);
+      const res = await fetchClientProjectTracking(project.id);
       setSelectedProjectDetails(res.data?.data);
     } catch {
       // بيانات وهمية للمراحل حسب المشروع
@@ -87,18 +83,27 @@ const res = await fetchClientProjectTracking(project.id);
       };
       setSelectedProjectDetails({ stages: stagesData[project.id] || stagesData[1] });
     }
-  };
+  }, []); // <-- نهاية useCallback بشكل صحيح
 
-// تقديم شكوى
+  // فتح تفاصيل المشروع تلقائياً إذا تم التوجيه من واجهة أخرى
+  useEffect(() => {
+    if (targetProject) {
+      handleViewProject(targetProject);
+      // تصفير القيمة حتى لا يفتح المشروع مرة أخرى عند التنقل بين التبويبات
+      if (setTargetProject) setTargetProject(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetProject]);
+
+  // تقديم شكوى
   const handleSubmitComplaint = async (e) => {
     e.preventDefault();
     if (!complaintText.trim()) return;
     try {
       await submitClientComplaint({
-        providerName: complaintProvider || selectedProject?.provider,
-        projectTitle: complaintProject || selectedProject?.title,
-        description: complaintText,
-        images: complaintImages
+        providerName: selectedProject?.provider,
+        projectTitle: selectedProject?.title,
+        description: complaintText
       });
     } catch (err) {
       console.warn('⚠️ API غير متاح:', err.message);
@@ -108,9 +113,6 @@ const res = await fetchClientProjectTracking(project.id);
     setSelectedProject(null);
     setSelectedProjectDetails(null);
     setComplaintText('');
-    setComplaintProvider('');
-    setComplaintProject('');
-    setComplaintImages([]);
   };
 
   if (loading) {
@@ -378,7 +380,7 @@ const res = await fetchClientProjectTracking(project.id);
 
           {/* أزرار الإجراءات */}
           <div className="d-flex justify-content-center gap-3 mt-5 pt-4 border-top flex-wrap">
-{selectedProject.progress === 100 && (
+            {selectedProject.progress === 100 && (
               <button 
                 className="btn fw-bold px-5 py-3 rounded-pill shadow-sm text-white d-flex align-items-center gap-2"
                 style={{ backgroundColor: '#ff8a00', fontSize: '18px' }}
@@ -407,7 +409,7 @@ const res = await fetchClientProjectTracking(project.id);
         </div>
       )}
 
-{/* ================ واجهة تقييم المشروع (نجوم + تعليق) ================ */}
+      {/* ================ واجهة تقييم المشروع (نجوم + تعليق) ================ */}
       {view === 'rate' && selectedProject && (
         <ProjectRatingForm
           project={selectedProject}
@@ -430,37 +432,22 @@ const res = await fetchClientProjectTracking(project.id);
               <FaExclamationTriangle size={40} />
             </div>
             <h3 className="fw-bold" style={{ color: '#1b2a47' }}>تقديم شكوى</h3>
-            <p className="text-muted fw-semibold fs-5">
-              مشروع: {selectedProject.title}
-            </p>
-            <p className="text-muted fw-semibold">
-              مزود الخدمة: {selectedProject.provider}
-            </p>
+            <p className="text-muted fw-semibold fs-5">أنت تقوم بتقديم شكوى بخصوص هذا المشروع</p>
           </div>
 
-<form onSubmit={handleSubmitComplaint}>
+          <form onSubmit={handleSubmitComplaint}>
             <div className="row g-4 mb-4">
               <div className="col-md-6">
                 <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>اسم مزود الخدمة</label>
-                <input 
-                  type="text" 
-                  className="form-control p-3 bg-light border" 
-                  placeholder="أدخل اسم مزود الخدمة"
-                  style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}
-                  value={complaintProvider}
-                  onChange={(e) => setComplaintProvider(e.target.value)}
-                />
+                <div className="form-control p-3 bg-light text-muted fw-bold border" style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}>
+                  {selectedProject.provider || selectedProject.providerName}
+                </div>
               </div>
               <div className="col-md-6">
                 <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>المشروع المرتبط</label>
-                <input 
-                  type="text" 
-                  className="form-control p-3 bg-light border" 
-                  placeholder="أدخل اسم المشروع"
-                  style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}
-                  value={complaintProject}
-                  onChange={(e) => setComplaintProject(e.target.value)}
-                />
+                <div className="form-control p-3 bg-light text-muted fw-bold border" style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}>
+                  {selectedProject.title || selectedProject.projectTitle}
+                </div>
               </div>
             </div>
 
@@ -477,14 +464,6 @@ const res = await fetchClientProjectTracking(project.id);
               ></textarea>
             </div>
 
-            <div className="mb-4">
-              <ImageUploader 
-                images={complaintImages} 
-                onChange={setComplaintImages} 
-                label="صور المشكلة"
-              />
-            </div>
-
             <div className="alert alert-warning rounded-4 p-4 mb-4 d-flex align-items-center gap-3">
               <FaExclamationTriangle className="fs-3 flex-shrink-0" />
               <div>
@@ -494,7 +473,7 @@ const res = await fetchClientProjectTracking(project.id);
             </div>
 
             <div className="d-flex justify-content-center gap-3 flex-wrap">
-<button type="submit" className="btn btn-danger fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2" style={{ fontSize: '20px' }}>
+              <button type="submit" className="btn btn-danger fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2" style={{ fontSize: '20px' }}>
                 <FaPaperPlane /> إرسال الشكوى
               </button>
               <button 
@@ -515,4 +494,3 @@ const res = await fetchClientProjectTracking(project.id);
 };
 
 export default TrackingTab;
-

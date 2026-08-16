@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { FaMoneyBillWave, FaUserTie, FaRegClock, FaFileContract, FaCheckCircle, FaSpinner, FaTruck, FaStar, FaArrowRight, FaPlus, FaExclamationTriangle, FaCheck, FaHourglassHalf, FaEdit, FaTrash, FaSave, FaTimes, FaMapMarkerAlt, FaBuilding, FaCalendarAlt, FaEye, FaTimesCircle, FaHardHat, FaPaperPlane } from 'react-icons/fa';
 import OfferDetails from './OfferDetails';
 import ProjectRatingForm from '../../../components/ProjectRatingForm';
-import ImageUploader from '../../../components/ImageUploader';
 
-const OffersTab = () => {
+const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
     const [offerStatus, setOfferStatus] = useState('pending');
     // tracking: 'list' | 'details' | 'complaint' | 'edit' | 'view-offers' | 'offer-detail' | 'rate'
     const [trackingView, setTrackingView] = useState('list');
     const [selectedProject, setSelectedProject] = useState(null);
     const [selectedOffer, setSelectedOffer] = useState(null);
-    const [complaintImages, setComplaintImages] = useState([]);
     const [editForm, setEditForm] = useState({
         title: '', description: '', governorate: '', area: '', providerType: '', tenderDays: ''
     });
@@ -210,7 +208,7 @@ const OffersTab = () => {
         : offerStatus === 'ongoing' ? ongoingOffers 
         : completedOffers;
 
-const startEdit = (project) => {
+    const startEdit = (project) => {
         setEditForm({
             title: project.projectTitle,
             description: project.description || project.details,
@@ -527,7 +525,7 @@ const startEdit = (project) => {
                     </>
                 )}
                 <div className="d-flex justify-content-center gap-3 mt-5 pt-4 border-top flex-wrap">
-{selectedProject.progress === 100 && (
+                    {selectedProject.progress === 100 && (
                         <button 
                             className="btn fw-bold px-5 py-3 rounded-pill text-white d-flex align-items-center gap-2" 
                             style={{ backgroundColor: '#ff8a00', fontSize: '20px' }}
@@ -550,7 +548,7 @@ const startEdit = (project) => {
         );
     }
 
-// واجهة تقييم المشروع (نجوم + تعليق لمزود الخدمة)
+    // واجهة تقييم المشروع (نجوم + تعليق لمزود الخدمة)
     if (trackingView === 'rate' && selectedProject) {
         return (
             <ProjectRatingForm
@@ -560,46 +558,66 @@ const startEdit = (project) => {
         );
     }
 
-// نموذج تقديم شكوى
+    // نموذج تقديم شكوى
     if (trackingView === 'complaint' && selectedProject) {
         return (
-            <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mx-auto" style={{ maxWidth: '100%' }}>
+            <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mx-auto" style={{ maxWidth: '800px' }}>
                 <button 
-                    className="btn btn-light fw-bold mb-4 w-auto me-auto d-flex align-items-center gap-2" 
+                    className="btn btn-light fw-bold mb-4 w-auto me-auto d-flex align-items-center gap-2 rounded-pill px-4 py-2 shadow-sm" 
                     onClick={() => setTrackingView('details')}
                 >
-                    <FaArrowRight /> العودة
+                    <FaArrowRight /> العودة للتفاصيل
                 </button>
                 <div className="text-center mb-5">
-                    <FaExclamationTriangle className="text-danger mb-3" size={50} />
+                    <div className="bg-danger bg-opacity-10 text-danger p-4 rounded-circle d-inline-flex mb-3">
+                        <FaExclamationTriangle size={40} />
+                    </div>
                     <h3 className="fw-bold" style={{ color: '#1b2a47' }}>نموذج تقديم شكوى</h3>
-                    <p className="text-muted fw-semibold">{selectedProject.projectTitle} - {selectedProject.providerName}</p>
+                    <p className="text-muted fw-semibold fs-5">أنت تقوم بتقديم شكوى بخصوص هذا المشروع</p>
                 </div>
-<form onSubmit={(e) => { e.preventDefault(); alert('تم إرسال الشكوى!'); setTrackingView('list'); setComplaintImages([]); setSelectedProject(null); }}>
+
+                <form onSubmit={(e) => { e.preventDefault(); alert('تم إرسال الشكوى بنجاح!'); setTrackingView('list'); setSelectedProject(null); }}>
                     <div className="row g-4 mb-4">
                         <div className="col-md-6">
-                            <label className="fw-bold mb-2 text-muted">اسم مزود الخدمة</label>
-                            <input type="text" className="form-control p-3 bg-light" placeholder="أدخل اسم مزود الخدمة" defaultValue={selectedProject.providerName || ''} />
+                            <label className="fw-bold mb-2 text-muted fs-5">اسم مزود الخدمة</label>
+                            <div className="form-control p-3 bg-light text-muted fw-bold border" style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}>
+                                {selectedProject.providerName || selectedProject.provider}
+                            </div>
                         </div>
                         <div className="col-md-6">
-                            <label className="fw-bold mb-2 text-muted">المشروع المرتبط</label>
-                            <input type="text" className="form-control p-3 bg-light" placeholder="أدخل اسم المشروع" defaultValue={selectedProject.projectTitle || ''} />
+                            <label className="fw-bold mb-2 text-muted fs-5">المشروع المرتبط</label>
+                            <div className="form-control p-3 bg-light text-muted fw-bold border" style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}>
+                                {selectedProject.projectTitle || selectedProject.title}
+                            </div>
                         </div>
                     </div>
+                    
                     <div className="mb-4">
-                        <label className="fw-bold mb-2 text-muted">وصف المشكلة</label>
-                        <textarea className="form-control p-4 bg-light" rows="5" placeholder="اكتب وصفاً تفصيلياً للمشكلة..." required></textarea>
+                        <label className="fw-bold mb-3 text-dark fs-5">وصف المشكلة بالتفصيل</label>
+                        <textarea className="form-control p-4 bg-light border" rows="6" placeholder="اكتب وصفاً تفصيلياً للمشكلة..." style={{ borderColor: '#e2e8f0', fontSize: '18px', borderRadius: '12px', lineHeight: '1.8' }} required></textarea>
                     </div>
-                    <div className="mb-4">
-                        <ImageUploader 
-                            images={complaintImages} 
-                            onChange={setComplaintImages} 
-                            label="صور المشكلة"
-                        />
+
+                    <div className="alert alert-warning rounded-4 p-4 mb-4 d-flex align-items-center gap-3">
+                        <FaExclamationTriangle className="fs-3 flex-shrink-0" />
+                        <div>
+                            <strong className="d-block">ملاحظة:</strong>
+                            <span className="fw-semibold">سيتم إرسال شكواك إلى إدارة المنصة للمراجعة والتحقق. سيتم الرد عليك خلال مدة أقصاها 48 ساعة.</span>
+                        </div>
                     </div>
-                    <button type="submit" className="btn w-100 fw-bold py-3 btn-danger fs-4 rounded-pill shadow-sm d-flex align-items-center justify-content-center gap-2">
-                        <FaPaperPlane /> إرسال الشكوى
-                    </button>
+
+                    <div className="d-flex justify-content-center gap-3 flex-wrap">
+                        <button type="submit" className="btn fw-bold px-5 py-3 btn-danger fs-5 rounded-pill shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <FaPaperPlane /> إرسال الشكوى
+                        </button>
+                        <button 
+                            type="button" 
+                            className="btn fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2"
+                            style={{ backgroundColor: '#e2e8f0', color: '#1b2a47', fontSize: '20px' }}
+                            onClick={() => setTrackingView('details')}
+                        >
+                            إلغاء
+                        </button>
+                    </div>
                 </form>
             </div>
         );
@@ -829,11 +847,25 @@ const startEdit = (project) => {
                                             <p className="text-muted fw-bold mb-1"><FaMoneyBillWave className="me-1" /> {project.progress === 100 ? 'القيمة النهائية' : 'قيمة العرض المعتمد'}</p>
                                             <h3 className={`fw-bold mb-4 ${project.progress === 100 ? 'text-secondary' : ''}`} style={{ color: project.progress === 100 ? '#6c757d' : '#ff8a00' }}>{project.price} ر.س</h3>
                                             {project.progress < 100 ? (
-                                                <button className="btn fw-bold py-2 rounded-pill shadow-sm w-100" style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '18px' }} onClick={() => { setSelectedProject(project); setTrackingView('details'); }}>
-                                                    <FaTruck className="me-2" /> عرض تفاصيل المشروع
+                                                <button 
+                                                    className="btn fw-bold py-2 rounded-pill shadow-sm w-100" 
+                                                    style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '18px' }} 
+                                                    onClick={() => { 
+                                                        setTargetTrackingProject(project); 
+                                                        setActiveTab('tracking'); 
+                                                    }}
+                                                >
+                                                    <FaTruck className="me-2" /> متابعة تفاصيل المشروع
                                                 </button>
                                             ) : (
-                                                <button className="btn fw-bold py-2 rounded-pill shadow-sm w-100" style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '18px' }} onClick={() => { setSelectedProject(project); setTrackingView('details'); }}>
+                                                <button 
+                                                    className="btn fw-bold py-2 rounded-pill shadow-sm w-100" 
+                                                    style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '18px' }} 
+                                                    onClick={() => { 
+                                                        setTargetTrackingProject(project); 
+                                                        setActiveTab('tracking'); 
+                                                    }}
+                                                >
                                                     <FaCheckCircle className="me-2" /> عرض التفاصيل والتقييم
                                                 </button>
                                             )}
@@ -861,4 +893,3 @@ const startEdit = (project) => {
 };
 
 export default OffersTab;
-
