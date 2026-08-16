@@ -3,9 +3,8 @@ import axios from 'axios';
 // 1. إعداد الرابط الأساسي للسيرفر (مطبخ Laravel)
 // (هذا الرابط الافتراضي، سنقوم بتغييره لاحقاً إذا رفعنا الموقع على الإنترنت)
 const apiReq = axios.create({
-    baseURL: 'http://127.0.0.1:8000/api', 
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api',
     headers: {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
     }
 });
@@ -19,6 +18,10 @@ apiReq.interceptors.request.use(
         if (token) {
             // إذا وجد التوكن، يلصقه في رأس الطلب (Headers)
             config.headers.Authorization = `Bearer ${token}`; 
+        }
+        // إذا كان الحمولة FormData، اترك axios يحدد Content-Type المناسب
+        if (config.data && typeof FormData !== 'undefined' && config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
         }
         return config;
     },

@@ -10,6 +10,9 @@ import Register from '../pages/Register';
 import Guidance from '../pages/Guidance';
 import ClientDashboard from '../pages/client/ClientDashboard';
 
+// تم تصحيح مسار الاستيراد هنا (استخدام ../ بدلاً من ./)
+import ResetPassword from '../pages/ResetPassword'; 
+
 // استدعاء لوحة تحكم مزود الخدمة الحقيقية
 import ProviderDashboard from '../pages/provider/ProviderDashboard';
 
@@ -45,6 +48,7 @@ const AppRoutes = () => {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/guidance" element={<Guidance />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                 </Route>
 
                 {/* --- مسارات لوحات التحكم (داخل قالب لوحة التحكم المستقل) --- */}

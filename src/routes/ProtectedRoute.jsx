@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { getAuthUser, isLoggedIn } from '../services/auth';
+import { getAuthUser, getDashboardPath, isLoggedIn, normalizeUserType } from '../services/auth';
 
 const ProtectedRoute = ({ allowedRoles }) => {
     const loggedIn = isLoggedIn();
@@ -10,12 +10,12 @@ const ProtectedRoute = ({ allowedRoles }) => {
         return <Navigate to="/login" replace />;
     }
 
+    const userType = normalizeUserType(user.type);
+
     // تحقق من نوع المستخدم (إذا كان محدداً)
-    if (allowedRoles && !allowedRoles.includes(user.type)) {
+    if (allowedRoles && !allowedRoles.some(role => normalizeUserType(role) === userType)) {
         // توجيه لنوع لوحة التحكم المناسب
-        if (user.type === 'client') return <Navigate to="/client/dashboard" replace />;
-        if (user.type === 'provider') return <Navigate to="/provider/dashboard" replace />;
-        return <Navigate to="/login" replace />;
+        return <Navigate to={getDashboardPath(user)} replace />;
     }
 
     return <Outlet />;

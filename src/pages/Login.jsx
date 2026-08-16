@@ -4,7 +4,6 @@ import { toast } from 'react-toastify';
 import loginBg from '../assets/login-bg.jpg';
 import { login } from '../services/api/authApi';
 import { setAuth, getDashboardPath } from '../services/auth';
-import { FaUserShield } from 'react-icons/fa';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -13,19 +12,6 @@ const Login = () => {
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-// دخول تجريبي كمدير (لأغراض العرض قبل ربط الباك)
-    const handleDemoAdmin = () => {
-        const demoAdmin = {
-            id: 1,
-            name: 'مدير المنصة',
-            email: 'admin@darakom.sy',
-            type: 'admin'
-        };
-        setAuth('demo-admin-token', demoAdmin);
-        toast.success('تم تسجيل الدخول كمدير (وضع تجريبي)!');
-        navigate('/admin/dashboard');
     };
 
     const handleLogin = async (e) => {
@@ -105,17 +91,8 @@ const Login = () => {
                                             تذكرني
                                         </label>
                                     </div>
-                                    <Link to="#" className="fw-bold text-decoration-none" style={{ color: 'var(--secondary-color)', fontSize: '22px' }}>
+                                    <button type="button" onClick={() => navigate('/reset-password?step=email')} className="btn p-0 fw-bold text-decoration-none" style={{ color: 'var(--secondary-color)', fontSize: '22px', background: 'none', border: 'none' }}>
                                         هل نسيت كلمة المرور؟
-                                    </Link>
-                                </div>
-
-{/* دخول تجريبي كمدير */}
-                                <div className="col-12 mt-4">
-                                    <button type="button" onClick={handleDemoAdmin}
-                                        className="btn w-100 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2"
-                                        style={{ backgroundColor: '#1b2a47', color: 'white', borderRadius: '15px', transition: '0.3s', fontSize: '24px', padding: '16px' }}>
-                                        <FaUserShield /> دخول تجريبي كمدير
                                     </button>
                                 </div>
 

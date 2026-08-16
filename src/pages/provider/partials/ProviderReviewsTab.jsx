@@ -23,23 +23,26 @@ const ProviderReviewsTab = () => {
           fetchReceivedReviews(),
           fetchGivenReviews()
         ]);
-if (recRes.value?.data?.data) setReceived(recRes.value.data.data);
-        if (givRes.value?.data?.data) setGiven(givRes.value.data.data);
-      } catch { /* ignore */ }
+        const recData = recRes.status === 'fulfilled' ? (recRes.value?.data?.data || []) : [];
+        const givData = givRes.status === 'fulfilled' ? (givRes.value?.data?.data || []) : [];
+        setReceived(recData);
+        setGiven(givData);
 
-      // Fallback data
-      if (received.length === 0 && given.length === 0) {
-        setReceived([
-          { id: 1, client_name: 'أحمد سليمان', client_avatar: 'أ', project_title: 'بناء عظم - 400م', rating: 5, review_text: 'مهندس محترف جداً ومخلص في عمله. تم تسليم المشروع قبل الموعد.', date: '2026/05/15' },
-          { id: 2, client_name: 'خالد عبدالله', client_avatar: 'خ', project_title: 'تشطيب شقة 150م', rating: 4, review_text: 'عمل جيد والتزم بالجدول الزمني.', date: '2026/03/20' },
-          { id: 3, client_name: 'سارة ناصر', client_avatar: 'س', project_title: 'تصميم داخلي لفيلا', rating: 5, review_text: 'تصاميم إبداعية وذوق رفيع!', date: '2025/11/10' },
-        ]);
-        setGiven([
-          { id: 4, provider_name: 'فني كهرباء: محمد علي', project_title: 'تمديدات كهرباء لفيلا', rating: 5, review_text: 'فني ممتاز ومتقن لعمله.', date: '2026/06/01' },
-          { id: 5, provider_name: 'مؤسسة الحدادة الفنية', project_title: 'درابزين وسلالم حديد', rating: 4, review_text: 'جودة ممتازة، تأخير بسيط.', date: '2026/04/18' },
-        ]);
+        // Fallback data if both empty
+        if (recData.length === 0 && givData.length === 0) {
+          setReceived([
+            { id: 1, client_name: 'أحمد سليمان', client_avatar: 'أ', project_title: 'بناء عظم - 400م', rating: 5, review_text: 'مهندس محترف جداً ومخلص في عمله. تم تسليم المشروع قبل الموعد.', date: '2026/05/15' },
+            { id: 2, client_name: 'خالد عبدالله', client_avatar: 'خ', project_title: 'تشطيب شقة 150م', rating: 4, review_text: 'عمل جيد والتزم بالجدول الزمني.', date: '2026/03/20' },
+            { id: 3, client_name: 'سارة ناصر', client_avatar: 'س', project_title: 'تصميم داخلي لفيلا', rating: 5, review_text: 'تصاميم إبداعية وذوق رفيع!', date: '2025/11/10' },
+          ]);
+          setGiven([
+            { id: 4, provider_name: 'فني كهرباء: محمد علي', project_title: 'تمديدات كهرباء لفيلا', rating: 5, review_text: 'فني ممتاز ومتقن لعمله.', date: '2026/06/01' },
+            { id: 5, provider_name: 'مؤسسة الحدادة الفنية', project_title: 'درابزين وسلالم حديد', rating: 4, review_text: 'جودة ممتازة، تأخير بسيط.', date: '2026/04/18' },
+          ]);
+        }
+      } catch { /* ignore */ } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, []);
