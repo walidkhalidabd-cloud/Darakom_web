@@ -6,9 +6,10 @@ import {
   FaExclamationTriangle, FaBuilding,
   FaPlusCircle, FaTrash, FaImage, FaTimes,
   FaThumbsUp, FaComment, FaShare,
-  FaGlobeAsia
+  FaGlobeAsia, FaIdCard
 } from 'react-icons/fa';
 import { fetchProfile, updateProfile } from '../../../services/api/providerApi';
+import ImageUploader from '../../../components/ImageUploader';
 import './provider-tabs.css';
 
 const ProviderProfileTab = () => {
@@ -19,17 +20,25 @@ const ProviderProfileTab = () => {
   const [toast, setToast] = useState(null);
   const fileInputRef = useRef(null);
   
+  // هيكل البيانات الأساسية المطابق لنموذج التسجيل
   const [profileData, setProfileData] = useState({
     first_name: '', last_name: '', email: '', phone: '', location: '',
-    specialization: '', experience_years: '', license_number: '', craft_type: '',
-    bio: '', services: [], avatar_url: null, projects_completed: 0,
+    provider_type: '', // شركة/مؤسسة، مهندس، حرفي/فني
+    company_name: '', commercial_register: '',
+    syndicate_number: '', engineering_specialization: '',
+    craft_type: '',
+    experience_years: '',
+    bio: '',
+    services: [], avatar_url: null, projects_completed: 0,
     active_projects: 0, average_rating: 0
   });
 
   const [projects, setProjects] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newProject, setNewProject] = useState({ title: '', description: '', location: '', date: '', images: [] });
-  const [previewImages, setPreviewImages] = useState([]);
+  
+  // نموذج إضافة العمل السابق مبسط جداً (وصف + صور فقط)
+  const [newProject, setNewProject] = useState({ description: '', images: [] });
+  const [uploadedImages, setUploadedImages] = useState([]);
   const [likedPosts, setLikedPosts] = useState(new Set());
 
   useEffect(() => {
@@ -44,24 +53,48 @@ const ProviderProfileTab = () => {
         }
       } catch (err) {
         console.warn('⚠️ API غير متاح، استخدام بيانات وهمية:', err.message);
+        
+        // تحديث البيانات الوهمية لتتطابق مع معلومات التسجيل
         setProfileData({
-          first_name: 'محمد', last_name: 'العبد الرحيم', email: 'mohamed.a@example.com',
-          phone: '0999123456', location: 'دمشق',
-          specialization: 'مهندس مدني', experience_years: '8 سنوات', license_number: 'مهندس نقابي رقم 12345',
-          craft_type: '', bio: 'مهندس مدني بخبرة تزيد عن 8 سنوات في مجال الإشراف على المشاريع السكنية والتجارية.',
-          services: ['تصميم معماري', 'إشراف هندسي', 'إدارة مشاريع', 'استشارات هندسية'],
-          projects_completed: 25, active_projects: 3, average_rating: 4.9
+          first_name: 'وليد', 
+          last_name: 'محمد', 
+          email: 'walid1@gmail.com', 
+          phone: '0995499144', 
+          location: 'دمشق', 
+          provider_type: 'شركة/مؤسسة', 
+          company_name: 'مؤسسة وليد للمقاولات العامة', 
+          commercial_register: '458796', 
+          syndicate_number: '', 
+          engineering_specialization: '', 
+          craft_type: '',
+          experience_years: 5, 
+          bio: 'مؤسسة متخصصة في أعمال المقاولات العامة والتشطيبات الداخلية والخارجية بخبرة تمتد لأكثر من 5 سنوات في السوق المحلي. نسعى دائماً لتقديم الجودة والاحترافية لعملائنا.',
+          services: ['مقاولات عامة', 'بناء عظم', 'تشطيب كامل على المفتاح'],
+          projects_completed: 12, 
+          active_projects: 2, 
+          average_rating: 4.9
         });
+        
+        // بيانات تجريبية إضافية للأعمال السابقة (وصف وصور فقط)
         setProjects([
           { 
-            id: 1, title: 'تشطيب فيلا مودرن', 
-            description: 'تم بحمد الله الانتهاء من تشطيب فيلا سكنية بمساحة 500م في دمشق على الطراز المودرن. شملت الأعمال: تركيب سيراميك ورخام فاخر، دهانات ديكورية، أعمال جبس بورد، مطابخ ألمنيوم، ونظام إضاءة ذكي. سعيد جداً بنتيجة العمل وإعجاب العميل! 🏗️✨',
-            location: 'دمشق، المزة', date: 'ديسمبر 2025', images: [], likes: 24, comments: 5 
+            id: 1, 
+            description: 'تم بحمد الله الانتهاء من تشطيب فيلا سكنية بمساحة 500م في دمشق على الطراز المودرن. شملت الأعمال: تركيب سيراميك ورخام فاخر، دهانات ديكورية، أعمال جبس بورد، مطابخ ألمنيوم، ونظام إضاءة ذكي. تفخر مؤسستنا بتقديم أعلى معايير الجودة لعملائنا الكرام. 🏗️✨',
+            images: [
+              'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+              'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'
+            ], 
+            likes: 45, 
+            comments: 12 
           },
           { 
-            id: 2, title: 'بناء ملحق خارجي', 
-            description: 'انتهينا من بناء ملحق خارجي متكامل مكون من غرفتين وصالة ومطبخ مع خدمات. تم استخدام مواد عازلة للحرارة والرطوبة. مدة التنفيذ 45 يوماً فقط! 🔨🏠',
-            location: 'حلب، حي الفردوس', date: 'أغسطس 2025', images: [], likes: 18, comments: 3 
+            id: 2, 
+            description: 'جانب من أعمالنا في بناء ملحق خارجي متكامل مع تصميم وتنسيق الحديقة المحيطة به. تم استخدام أفضل المواد العازلة للحرارة والرطوبة لضمان استدامة البناء. مدة التنفيذ كانت قياسية! 🔨🏠',
+            images: [
+              'https://images.unsplash.com/photo-1558904541-efa843a96f09?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'
+            ], 
+            likes: 32, 
+            comments: 8 
           },
         ]);
       } finally { setLoading(false); }
@@ -72,7 +105,7 @@ const ProviderProfileTab = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-try {
+    try {
       await updateProfile({ ...profileData, past_projects: projects });
       showToast('success', '✅ تم حفظ التعديلات بنجاح!');
       setIsEditing(false);
@@ -86,50 +119,40 @@ try {
     setProfileData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleServicesChange = (e) => {
+    const servicesArray = e.target.value.split('،').map(s => s.trim());
+    setProfileData(prev => ({ ...prev, services: servicesArray }));
+  };
+
   const showToast = (type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleImageSelect = (e) => {
-    const files = Array.from(e.target.files);
-    const newPreviews = files.map(f => URL.createObjectURL(f));
-    setPreviewImages(prev => [...prev, ...newPreviews]);
-  };
-
-  const removeImage = (index) => {
-    URL.revokeObjectURL(previewImages[index]);
-    setPreviewImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const clearImages = () => {
-    previewImages.forEach(u => URL.revokeObjectURL(u));
-    setPreviewImages([]);
-  };
-
   const handleAddProject = () => {
-    if (!newProject.title.trim() || !newProject.description.trim()) {
-      showToast('error', '⚠️ الرجاء إدخال عنوان ووصف المشروع');
+    if (!newProject.description.trim()) {
+      showToast('error', '⚠️ الرجاء إدخال وصف العمل');
       return;
     }
+    
+    const newImageUrls = uploadedImages.map(img => URL.createObjectURL(img));
+
     setProjects(prev => [{
       id: Date.now(),
-      title: newProject.title,
       description: newProject.description,
-      location: newProject.location || 'غير محدد',
-      date: newProject.date || new Date().toISOString().slice(0, 7),
-      images: [...previewImages],
+      images: [...newImageUrls],
       likes: 0, comments: 0
     }, ...prev]);
-    setNewProject({ title: '', description: '', location: '', date: '', images: [] });
-    setPreviewImages([]);
+    
+    setNewProject({ description: '', images: [] });
+    setUploadedImages([]);
     setShowAddForm(false);
-    showToast('success', '✅ تم إضافة العمل السابق بنجاح!');
+    showToast('success', '✅ تم نشر العمل بنجاح!');
   };
 
   const handleDeleteProject = (id) => {
     setProjects(prev => prev.filter(p => p.id !== id));
-    showToast('info', '🗑️ تم حذف العمل السابق');
+    showToast('info', '🗑️ تم حذف المنشور');
   };
 
   const toggleLike = (id) => {
@@ -167,17 +190,20 @@ try {
   }
 
   const fullName = `${profileData.first_name} ${profileData.last_name}`;
-  const avatarLetter = profileData.first_name?.[0] || 'م';
+  const avatarLetter = profileData.first_name?.[0] || 'و';
+  
+  const displayTitle = profileData.provider_type === 'شركة/مؤسسة' ? profileData.company_name : 
+                       profileData.provider_type === 'مهندس' ? profileData.engineering_specialization : 
+                       profileData.craft_type || profileData.provider_type;
 
   return (
     <div className="mx-auto" style={{ maxWidth: '1200px' }}>
       {toast && <div className={`toast-custom toast-${toast.type}`}>{toast.message}</div>}
 
-      {/* عنوان الصفحة */}
       <div className="section-header">
         <div>
           <h3><FaUserEdit className="ms-2 text-warning" /> الملف الشخصي</h3>
-          <p>إدارة معلوماتك الشخصية والمهنية كموفر خدمة</p>
+          <p>إدارة معلوماتك الشخصية والمهنية وتوثيق خبراتك للعملاء</p>
         </div>
         {!isEditing ? (
           <button className="btn-provider-outline d-flex align-items-center gap-2" onClick={() => setIsEditing(true)}>
@@ -200,6 +226,7 @@ try {
 
       <form id="profileForm" onSubmit={handleSave}>
         <div className="row g-4">
+          
           <div className="col-lg-4">
             <div className="card-provider p-4 bg-white text-center" style={{ position: 'sticky', top: '20px' }}>
               <div className="position-relative d-inline-block mb-4">
@@ -222,11 +249,12 @@ try {
               </div>
               <h4 className="fw-bold mb-1" style={{ color: '#1b2a47' }}>{fullName}</h4>
               <p className="text-warning fw-bold mb-3 fs-5">
-                <FaBriefcase className="me-1" /> {profileData.specialization}
+                <FaBriefcase className="me-2" /> {displayTitle}
               </p>
-              <span className="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-bold mb-4 fs-6">
+              <span className="badge bg-success bg-opacity-10 text-success px-4 py-2 rounded-pill fw-bold mb-4 fs-6 border border-success border-opacity-25">
                 <FaShieldAlt className="me-1" /> حساب موثق
               </span>
+              
               <div className="row g-2 mt-3">
                 <div className="col-4">
                   <div className="bg-light p-2 rounded-3 border shadow-sm">
@@ -254,119 +282,149 @@ try {
           </div>
 
           <div className="col-lg-8">
-            <div className="card-provider p-4 p-md-5 bg-white">
-              <h4 className="fw-bold mb-4 pb-3 border-bottom" style={{ color: '#1b2a47' }}>
-                <FaUserEdit className="ms-2 text-warning" /> المعلومات الشخصية
+            <div className="card-provider p-4 p-md-5 bg-white border-top border-4 border-warning">
+              <h4 className="fw-bold mb-4 pb-3 border-bottom d-flex align-items-center gap-2" style={{ color: '#1b2a47' }}>
+                <FaIdCard className="text-warning" /> بيانات الحساب الأساسية
               </h4>
+              
               <div className="row g-4">
                 <div className="col-md-6">
-                  <label className="form-label fw-bold">الاسم الأول</label>
+                  <label className="form-label fw-bold text-dark">الاسم الأول</label>
                   <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`}
                     value={profileData.first_name} onChange={(e) => handleChange('first_name', e.target.value)} disabled={!isEditing} required />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label fw-bold">الاسم الأخير</label>
+                  <label className="form-label fw-bold text-dark">الاسم الأخير</label>
                   <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`}
                     value={profileData.last_name} onChange={(e) => handleChange('last_name', e.target.value)} disabled={!isEditing} required />
                 </div>
+
                 <div className="col-md-6">
-                  <label className="form-label fw-bold"><FaEnvelope className="ms-1 text-muted" /> البريد الإلكتروني</label>
+                  <label className="form-label fw-bold text-dark"><FaEnvelope className="ms-1 text-primary" /> البريد الإلكتروني</label>
                   <input type="email" className="form-control form-control-custom text-muted" value={profileData.email} disabled />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label fw-bold"><FaPhone className="ms-1 text-muted" /> رقم الهاتف</label>
+                  <label className="form-label fw-bold text-dark"><FaPhone className="ms-1 text-success" /> رقم الهاتف</label>
                   <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`}
                     value={profileData.phone} onChange={(e) => handleChange('phone', e.target.value)} disabled={!isEditing} required />
                 </div>
+
                 <div className="col-md-6">
-                  <label className="form-label fw-bold"><FaMapMarkerAlt className="ms-1 text-muted" /> المحافظة</label>
+                  <label className="form-label fw-bold text-dark"><FaMapMarkerAlt className="ms-1 text-danger" /> المحافظة</label>
                   <select className={`form-select form-control-custom ${isEditing ? 'border-warning' : ''}`}
-                    value={profileData.location} onChange={(e) => handleChange('location', e.target.value)} disabled={!isEditing}>
+                    value={profileData.location} onChange={(e) => handleChange('location', e.target.value)} disabled={!isEditing} required>
                     <option value="">اختر المحافظة...</option>
                     <option value="دمشق">دمشق</option>
                     <option value="ريف دمشق">ريف دمشق</option>
                     <option value="حلب">حلب</option>
                     <option value="حمص">حمص</option>
-                    <option value="حماة">حماة</option>
                     <option value="اللاذقية">اللاذقية</option>
                     <option value="طرطوس">طرطوس</option>
-                    <option value="إدلب">إدلب</option>
-                    <option value="الرقة">الرقة</option>
-                    <option value="دير الزور">دير الزور</option>
-                    <option value="الحسكة">الحسكة</option>
-                    <option value="درعا">درعا</option>
-                    <option value="السويداء">السويداء</option>
-                    <option value="القنيطرة">القنيطرة</option>
                   </select>
                 </div>
+
                 <div className="col-md-6">
-                  <label className="form-label fw-bold"><FaBuilding className="ms-1 text-muted" /> التخصص</label>
-                  <select className={`form-select form-control-custom ${isEditing ? 'border-warning' : ''}`}
-                    value={profileData.specialization} onChange={(e) => handleChange('specialization', e.target.value)} disabled={!isEditing} required>
-                    <option value="">اختر التخصص...</option>
-                    <option value="مكتب هندسي">مكتب هندسي</option>
-                    <option value="مهندس مدني">مهندس مدني</option>
-                    <option value="مهندس معماري">مهندس معماري</option>
-                    <option value="مهندس استشاري">مهندس استشاري</option>
-                    <option value="مقاول">مقاول</option>
-                    <option value="حرفي">حرفي</option>
-                  </select>
+                  <label className="form-label fw-bold text-dark">سنوات الخبرة العملية</label>
+                  <div className="input-group shadow-sm">
+                    <input 
+                      type="number" 
+                      min="0" 
+                      className={`form-control form-control-custom border-end-0 ${isEditing ? 'border-warning' : ''}`}
+                      placeholder="أدخل عدد السنوات..." 
+                      value={profileData.experience_years} 
+                      onChange={(e) => handleChange('experience_years', e.target.value)} 
+                      disabled={!isEditing} 
+                      required 
+                    />
+                    <span className={`input-group-text fw-bold bg-light ${isEditing ? 'border-warning border-start-0' : ''}`} style={{ color: '#1b2a47' }}>
+                        سنوات
+                    </span>
+                  </div>
                 </div>
+
+                <div className="col-12 mt-4">
+                    <h5 className="fw-bold mb-3 pb-2 border-bottom text-muted">التفاصيل المهنية</h5>
+                </div>
+
                 <div className="col-md-6">
-                  <label className="form-label fw-bold">سنوات الخبرة</label>
+                  <label className="form-label fw-bold text-dark"><FaBuilding className="ms-1 text-muted" /> نوع مزود الخدمة</label>
                   <select className={`form-select form-control-custom ${isEditing ? 'border-warning' : ''}`}
-                    value={profileData.experience_years} onChange={(e) => handleChange('experience_years', e.target.value)} disabled={!isEditing}>
-                    <option value="">اختر...</option>
-                    <option value="أقل من سنة">أقل من سنة</option>
-                    <option value="1-3 سنوات">1-3 سنوات</option>
-                    <option value="3-5 سنوات">3-5 سنوات</option>
-                    <option value="5-10 سنوات">5-10 سنوات</option>
-                    <option value="أكثر من 10 سنوات">أكثر من 10 سنوات</option>
+                    value={profileData.provider_type} onChange={(e) => handleChange('provider_type', e.target.value)} disabled={!isEditing} required>
+                    <option value="شركة/مؤسسة">شركة / مؤسسة مقاولات</option>
+                    <option value="مهندس">مهندس (مستقل أو مكتب)</option>
+                    <option value="حرفي/فني">حرفي / فني</option>
                   </select>
                 </div>
-                {profileData.specialization !== 'حرفي' && (
+
+                {profileData.provider_type === 'شركة/مؤسسة' && (
+                  <>
+                    <div className="col-md-6">
+                        <label className="form-label fw-bold text-dark">اسم الشركة أو المؤسسة</label>
+                        <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`} placeholder="مثال: شركة الأفق للمقاولات"
+                            value={profileData.company_name} onChange={(e) => handleChange('company_name', e.target.value)} disabled={!isEditing} required />
+                    </div>
+                    <div className="col-md-6">
+                        <label className="form-label fw-bold text-dark">رقم السجل التجاري</label>
+                        <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`}
+                            value={profileData.commercial_register} onChange={(e) => handleChange('commercial_register', e.target.value)} disabled={!isEditing} required />
+                    </div>
+                  </>
+                )}
+
+                {profileData.provider_type === 'مهندس' && (
+                  <>
+                    <div className="col-md-6">
+                        <label className="form-label fw-bold text-dark">التخصص الهندسي</label>
+                        <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`} placeholder="مثال: مهندس مدني، معماري..."
+                            value={profileData.engineering_specialization} onChange={(e) => handleChange('engineering_specialization', e.target.value)} disabled={!isEditing} required />
+                    </div>
+                    <div className="col-md-6">
+                        <label className="form-label fw-bold text-dark">الرقم النقابي</label>
+                        <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`}
+                            value={profileData.syndicate_number} onChange={(e) => handleChange('syndicate_number', e.target.value)} disabled={!isEditing} required />
+                    </div>
+                  </>
+                )}
+
+                {profileData.provider_type === 'حرفي/فني' && (
                   <div className="col-md-6">
-                    <label className="form-label fw-bold">الرقم النقابي / السجل التجاري</label>
-                    <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`}
-                      value={profileData.license_number} onChange={(e) => handleChange('license_number', e.target.value)} disabled={!isEditing} />
+                    <label className="form-label fw-bold text-dark"><FaTools className="ms-1 text-muted" /> نوع الحرفة أو المهنة</label>
+                    <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`} placeholder="مثال: فني كهرباء، سباك، دهان..."
+                        value={profileData.craft_type} onChange={(e) => handleChange('craft_type', e.target.value)} disabled={!isEditing} required />
                   </div>
                 )}
-                {profileData.specialization === 'حرفي' && (
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold"><FaTools className="ms-1" /> نوع الحرفة</label>
-                    <select className={`form-select form-control-custom ${isEditing ? 'border-warning' : ''}`}
-                      value={profileData.craft_type} onChange={(e) => handleChange('craft_type', e.target.value)} disabled={!isEditing}>
-                      <option value="">اختر الحرفة...</option>
-                      <option value="فني كهرباء">فني كهرباء</option>
-                      <option value="فني سباكة">فني سباكة</option>
-                      <option value="فني بلاط">فني بلاط</option>
-                      <option value="فني دهان">فني دهان</option>
-                      <option value="فني تكييف">فني تكييف</option>
-                      <option value="فني جبس بورد">فني جبس بورد</option>
-                      <option value="فني ألمنيوم">فني ألمنيوم</option>
-                      <option value="فني حدادة">فني حدادة</option>
-                    </select>
-                  </div>
-                )}
+
                 <div className="col-12">
-                  <label className="form-label fw-bold">الخدمات التي تقدمها</label>
-                  <div className="d-flex flex-wrap gap-2">
-                    {profileData.services?.map((service, index) => (
-                      <span key={index} className="badge bg-warning bg-opacity-15 text-dark px-3 py-2 rounded-pill fs-6 border border-warning border-opacity-25">
-                        {service}
-                      </span>
-                    ))}
-                  </div>
+                  <label className="form-label fw-bold text-dark">الخدمات التي تقدمها (افصل بينها بفاصلة "،")</label>
+                  {isEditing ? (
+                      <input type="text" className="form-control form-control-custom border-warning mb-2" placeholder="أدخل الخدمات مفصولة بفاصلة..."
+                        value={profileData.services?.join('، ')} onChange={handleServicesChange} />
+                  ) : (
+                      <div className="d-flex flex-wrap gap-2 mt-2">
+                        {profileData.services?.map((service, index) => (
+                          <span key={index} className="badge bg-warning bg-opacity-15 text-dark px-3 py-2 rounded-pill fs-6 border border-warning border-opacity-25 shadow-sm">
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                  )}
                 </div>
-                <div className="col-12">
-                  <label className="form-label fw-bold">نبذة عني (تظهر للعملاء)</label>
-                  <textarea className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`} rows="4"
-                    value={profileData.bio} onChange={(e) => handleChange('bio', e.target.value)} disabled={!isEditing}></textarea>
+
+                <div className="col-12 mt-4">
+                  <label className="form-label fw-bold text-dark d-flex align-items-center gap-2">
+                      <FaPen className="text-primary"/> نبذة عني (Bio)
+                  </label>
+                  <p className="text-muted small mb-2">تحدث عن خبراتك، مهاراتك، وما يميزك عن غيرك. هذا النص سيظهر للعملاء عند تصفح ملفك.</p>
+                  <textarea className={`form-control form-control-custom shadow-sm ${isEditing ? 'border-warning' : ''}`} rows="5"
+                    placeholder="اكتب نبذة احترافية عنك وعن أعمالك..."
+                    value={profileData.bio} onChange={(e) => handleChange('bio', e.target.value)} disabled={!isEditing} style={{ lineHeight: '1.8', fontSize: '16px' }}></textarea>
                 </div>
+
               </div>
+              
               {isEditing && (
                 <div className="text-center mt-5 pt-4 border-top">
-                  <button type="submit" className="btn-provider-orange d-inline-flex align-items-center gap-2 px-5 py-3" style={{ fontSize: '20px', minWidth: '300px' }} disabled={saving}>
+                  <button type="submit" className="btn-provider-orange d-inline-flex align-items-center justify-content-center gap-2 px-5 py-3 shadow-lg" style={{ fontSize: '20px', minWidth: '300px' }} disabled={saving}>
                     {saving ? <><FaSpinner className="fa-spin" /> جاري الحفظ...</> : <><FaSave /> حفظ جميع التغييرات</>}
                   </button>
                 </div>
@@ -376,189 +434,137 @@ try {
         </div>
       </form>
 
-      {/* ========== قسم الأعمال السابقة - نمط فيسبوك ========== */}
-      <div className="mt-5">
+      {/* ========== قسم الأعمال السابقة - نمط المنشورات ========== */}
+      <div className="mt-5 pt-3">
         <div className="section-header">
           <div>
             <h3><FaBuilding className="ms-2 text-warning" /> أعمالي السابقة</h3>
-            <p>سجل أعمالك المنفذة - مثل منشورات التواصل الاجتماعي</p>
+            <p>شارك صور وتفاصيل مشاريعك السابقة كمنشورات لتعزيز موثوقيتك أمام العملاء</p>
           </div>
-          <button className="btn-provider-orange d-inline-flex align-items-center gap-2 px-4 py-2"
+          <button className="btn-provider-orange d-inline-flex align-items-center gap-2 px-4 py-2 shadow-sm"
             onClick={() => setShowAddForm(!showAddForm)}>
-            <FaPlusCircle /> {showAddForm ? 'إلغاء' : 'إضافة عمل سابق'}
+            {showAddForm ? <><FaTimes /> إلغاء</> : <><FaPlusCircle /> إضافة عمل سابق</>}
           </button>
         </div>
 
-        {/* نموذج إضافة عمل سابق */}
+        {/* نموذج إضافة عمل سابق (مبسط: وصف وصور فقط) */}
         {showAddForm && (
-          <div className="card-provider p-4 p-md-5 bg-white mb-4 border-end border-4 border-warning">
+          <div className="card-provider p-4 p-md-5 bg-white mb-5 border-top border-4 border-warning shadow-sm">
             <h4 className="fw-bold mb-4" style={{ color: '#1b2a47' }}>إضافة عمل سابق جديد</h4>
             <div className="row g-4">
-              <div className="col-md-6">
-                <label className="form-label fw-bold">عنوان المشروع *</label>
-                <input type="text" className="form-control form-control-custom" placeholder="مثال: تشطيب فيلا سكنية"
-                  value={newProject.title} onChange={e => setNewProject(prev => ({ ...prev, title: e.target.value }))} />
-              </div>
-              <div className="col-md-3">
-                <label className="form-label fw-bold">الموقع</label>
-                <input type="text" className="form-control form-control-custom" placeholder="دمشق"
-                  value={newProject.location} onChange={e => setNewProject(prev => ({ ...prev, location: e.target.value }))} />
-              </div>
-              <div className="col-md-3">
-                <label className="form-label fw-bold">تاريخ الإنجاز</label>
-                <input type="month" className="form-control form-control-custom"
-                  value={newProject.date} onChange={e => setNewProject(prev => ({ ...prev, date: e.target.value }))} />
-              </div>
+              
               <div className="col-12">
-                <label className="form-label fw-bold">وصف العمل *</label>
-                <textarea className="form-control form-control-custom" rows="3" placeholder="اكتب وصفاً تفصيلياً..."
+                <label className="form-label fw-bold text-dark">وصف العمل *</label>
+                <textarea className="form-control form-control-custom" rows="4" placeholder="اكتب وصفاً تفصيلياً لما قمت بإنجازه في هذا المشروع..."
                   value={newProject.description} onChange={e => setNewProject(prev => ({ ...prev, description: e.target.value }))}></textarea>
               </div>
-              <div className="col-12">
-                <label className="form-label fw-bold">الصور</label>
-                <input type="file" ref={fileInputRef} className="d-none" multiple accept="image/*" onChange={handleImageSelect} />
-                <div className="d-flex flex-wrap gap-2 align-items-center">
-                  <button type="button" className="btn-provider-outline d-inline-flex align-items-center gap-2" onClick={() => fileInputRef.current?.click()}>
-                    <FaImage /> إضافة صور
-                  </button>
-                  {previewImages.length > 0 && (
-                    <button type="button" className="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-1" onClick={clearImages}>
-                      <FaTimes /> مسح الكل ({previewImages.length})
-                    </button>
-                  )}
-                </div>
-                {previewImages.length > 0 && (
-                  <div className="d-flex flex-wrap gap-2 mt-3">
-                    {previewImages.map((img, i) => (
-                      <div key={i} className="position-relative" style={{ width: '100px', height: '80px' }}>
-                        <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px' }} />
-                        <button className="btn btn-sm btn-danger rounded-circle position-absolute top-0 start-0 p-0 d-flex align-items-center justify-content-center"
-                          style={{ width: '24px', height: '24px', fontSize: '12px', transform: 'translate(-5px, -5px)' }}
-                          onClick={() => removeImage(i)}>
-                          <FaTimes />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+
+              <div className="col-12 mt-4">
+                <ImageUploader 
+                  images={uploadedImages} 
+                  onChange={setUploadedImages} 
+                  label="صور المشروع (إثبات جودة عملك)"
+                  maxImages={10}
+                />
               </div>
-              <div className="col-12 text-center mt-3">
-                <button className="btn-provider-orange d-inline-flex align-items-center gap-2 px-5 py-3" onClick={handleAddProject}>
-                  <FaPlusCircle /> إضافة العمل
+
+              <div className="col-12 text-center mt-4 border-top pt-4">
+                <button 
+                  className="btn-provider-orange d-inline-flex align-items-center gap-2 px-5 py-3 shadow" 
+                  onClick={handleAddProject}
+                  disabled={!newProject.description}
+                  style={{ fontSize: '18px' }}
+                >
+                  <FaPlusCircle /> نشر العمل في ملفي الشخصي
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* عرض الأعمال السابقة - نمط فيسبوك */}
-        <div className="d-flex flex-column gap-4">
+        {/* عرض المنشورات (الأعمال السابقة) */}
+        <div className="d-flex flex-column gap-5">
           {projects.length > 0 ? projects.map(project => {
             const isLiked = likedPosts.has(project.id);
             return (
               <div key={project.id} className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
 
-                {/* رأس المنشور - مثل فيسبوك */}
-                <div className="d-flex align-items-center justify-content-between p-3 pb-0">
+                <div className="d-flex align-items-center justify-content-between p-4 pb-0">
                   <div className="d-flex align-items-center gap-3">
                     <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm"
-                      style={{ width: '48px', height: '48px', fontSize: '22px', background: 'linear-gradient(135deg, #1b2a47, #2d4a7a)' }}>
+                      style={{ width: '55px', height: '55px', fontSize: '24px', background: 'linear-gradient(135deg, #1b2a47, #2d4a7a)' }}>
                       {avatarLetter}
                     </div>
                     <div>
-                      <h6 className="fw-bold mb-0" style={{ color: '#1b2a47', fontSize: '17px' }}>{fullName}</h6>
-                      <span className="text-muted small d-flex align-items-center gap-1">
-                        <FaGlobeAsia size={12} /> {project.date || 'غير محدد'} · <FaMapMarkerAlt size={11} /> {project.location}
+                      <h5 className="fw-bold mb-0 text-dark">{fullName}</h5>
+                      <span className="text-muted small fw-semibold d-flex align-items-center gap-1 mt-1">
+                         <FaGlobeAsia size={12} /> تم النشر في ملف الأعمال السابقة
                       </span>
                     </div>
                   </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="badge bg-warning bg-opacity-10 text-warning px-3 py-1 rounded-pill fw-bold border border-warning border-opacity-25" style={{ fontSize: '13px' }}>
-                      {project.title}
-                    </span>
-                    <button className="btn btn-light btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center"
-                      style={{ width: '36px', height: '36px' }} onClick={() => handleDeleteProject(project.id)} title="حذف">
-                      <FaTrash size={14} className="text-danger" />
-                    </button>
-                  </div>
+                  <button className="btn btn-light btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center"
+                    style={{ width: '40px', height: '40px' }} onClick={() => handleDeleteProject(project.id)} title="حذف المنشور">
+                    <FaTrash size={16} className="text-danger" />
+                  </button>
                 </div>
 
-                {/* نص المنشور */}
-                <div className="p-3 pb-2">
-                  <p className="mb-0" style={{ lineHeight: '1.7', fontSize: '15px', color: '#1c1e21' }}>{project.description}</p>
+                {/* الوصف مباشرة بدون عنوان */}
+                <div className="p-4">
+                  <p className="mb-0 text-dark fw-semibold" style={{ lineHeight: '1.8', fontSize: '17px' }}>{project.description}</p>
                 </div>
 
-                {/* صور المنشور */}
                 {project.images && project.images.length > 0 ? (
-                  <div className="bg-light" style={{ maxHeight: '400px', overflow: 'hidden' }}>
+                  <div className="bg-light d-flex justify-content-center" style={{ maxHeight: '500px', overflow: 'hidden' }}>
                     {project.images.length === 1 ? (
-                      <img src={project.images[0]} alt="" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover' }} />
+                      <img src={project.images[0]} alt="" style={{ width: '100%', maxHeight: '500px', objectFit: 'contain', backgroundColor: '#f8f9fa' }} />
                     ) : (
-                      <div className="d-flex flex-wrap">
+                      <div className="d-flex flex-wrap w-100">
                         {project.images.slice(0, 4).map((img, i) => (
-                          <div key={i} style={{ width: project.images.length === 2 ? '50%' : '33.33%', height: '200px' }}
-                            className="border border-white border-1">
+                          <div key={i} style={{ width: project.images.length === 2 ? '50%' : '33.33%', height: '250px' }}
+                            className="border border-white border-2">
                             <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="px-3 pb-2">
-                    <div className="d-flex gap-2">
-                      <div className="d-flex align-items-center justify-content-center bg-light rounded-3 flex-grow-1"
-                        style={{ height: '150px', border: '1px dashed #cbd5e1' }}>
-                        <div className="text-center">
-                          <FaImage size={40} className="text-muted opacity-50 d-block mx-auto mb-2" />
-                          <span className="text-muted small fw-bold">لا توجد صور مرفوعة</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                ) : null}
 
-                {/* إحصائيات الإعجاب والتعليقات - مثل فيسبوك */}
-                <div className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom mx-3">
-                  <div className="d-flex align-items-center gap-1">
-                    <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center" style={{ width: '20px', height: '20px' }}>
-                      <FaThumbsUp size={10} className="text-white" />
+                <div className="d-flex justify-content-between align-items-center px-4 py-3 border-bottom mx-2 mt-2">
+                  <div className="d-flex align-items-center gap-2">
+                    <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center shadow-sm" style={{ width: '24px', height: '24px' }}>
+                      <FaThumbsUp size={12} className="text-white" />
                     </div>
-                    <span className="text-muted small fw-semibold">{project.likes || 0}</span>
+                    <span className="text-muted fw-bold">{project.likes || 0}</span>
                   </div>
-                  <div className="d-flex gap-3">
-                    <span className="text-muted small fw-semibold">{project.comments || 0} تعليق</span>
-                    <span className="text-muted small fw-semibold">0 مشاركة</span>
+                  <div className="d-flex gap-4">
+                    <span className="text-muted fw-bold">{project.comments || 0} تعليقات</span>
+                    <span className="text-muted fw-bold">مشاركة</span>
                   </div>
                 </div>
 
-                {/* أزرار التفاعل - مثل فيسبوك */}
-                <div className="d-flex px-3 py-1">
-                  <button className={`btn btn-light flex-grow-1 d-flex align-items-center justify-content-center gap-2 py-2 fw-bold rounded-0 border-0 ${isLiked ? 'text-primary' : 'text-muted'}`}
-                    style={{ fontSize: '15px' }} onClick={() => toggleLike(project.id)}>
-                    <FaThumbsUp size={16} className={isLiked ? '' : ''} /> إعجاب
+                <div className="d-flex px-3 py-2">
+                  <button className={`btn btn-light flex-grow-1 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold rounded-3 border-0 transition-hover ${isLiked ? 'text-primary bg-primary bg-opacity-10' : 'text-muted'}`}
+                    style={{ fontSize: '16px' }} onClick={() => toggleLike(project.id)}>
+                    <FaThumbsUp size={18} /> إعجاب
                   </button>
-                  <button className="btn btn-light flex-grow-1 d-flex align-items-center justify-content-center gap-2 py-2 fw-bold text-muted rounded-0 border-0"
-                    style={{ fontSize: '15px' }}>
-                    <FaComment size={16} /> تعليق
+                  <button className="btn btn-light flex-grow-1 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold text-muted rounded-3 border-0 transition-hover"
+                    style={{ fontSize: '16px' }}>
+                    <FaComment size={18} /> تعليق
                   </button>
-                  <button className="btn btn-light flex-grow-1 d-flex align-items-center justify-content-center gap-2 py-2 fw-bold text-muted rounded-0 border-0"
-                    style={{ fontSize: '15px' }}>
-                    <FaShare size={16} /> مشاركة
+                  <button className="btn btn-light flex-grow-1 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold text-muted rounded-3 border-0 transition-hover"
+                    style={{ fontSize: '16px' }}>
+                    <FaShare size={18} /> مشاركة
                   </button>
                 </div>
 
               </div>
             );
           }) : (
-            <div className="empty-state">
-              <FaBuilding size={60} />
-              <h4>لا توجد أعمال سابقة بعد</h4>
-              <p>أضف أعمالك السابقة لعرضها كمنشورات</p>
-              <button className="btn-provider-orange mt-3 d-inline-flex align-items-center gap-2 px-4 py-2"
-                onClick={() => setShowAddForm(true)}>
-                <FaPlusCircle /> إضافة أول عمل سابق
-              </button>
+            <div className="empty-state py-5">
+              <FaBuilding size={70} className="text-muted opacity-25 mb-3" />
+              <h4 className="fw-bold text-muted">ملف الأعمال فارغ</h4>
+              <p className="text-muted fw-semibold">لم تقم بإضافة أي أعمال سابقة حتى الآن.</p>
             </div>
           )}
         </div>
@@ -568,4 +574,3 @@ try {
 };
 
 export default ProviderProfileTab;
-
