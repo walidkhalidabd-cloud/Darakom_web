@@ -1,9 +1,16 @@
-import { FaBell, FaShieldAlt } from 'react-icons/fa';
+import { FaBell, FaShieldAlt, FaBars } from 'react-icons/fa';
 
-const AdminTopbar = ({ activeTabName, setActiveTab }) => {
+const AdminTopbar = ({ activeTabName, setActiveTab, isSidebarOpen, setIsSidebarOpen }) => {
   return (
     <div className="bg-white p-3 d-flex justify-content-between align-items-center shadow-sm sticky-top z-1">
-      <h3 className="fw-bold mb-0 text-dark d-none d-md-block">{activeTabName}</h3>
+      <div className="d-flex align-items-center gap-3">
+        {/* زر فتح وإغلاق القائمة للجوال */}
+        <button className="btn btn-light d-lg-none" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+            <FaBars />
+        </button>
+        <h3 className="fw-bold mb-0 text-dark d-none d-md-block">{activeTabName}</h3>
+      </div>
+      
       <div className="d-flex align-items-center gap-4">
         <div
           className="position-relative"

@@ -53,15 +53,23 @@ const UsersTab = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-useEffect(() => {
+  useEffect(() => {
     const loadUsers = async () => {
       setLoading(true);
       try {
         const res = await fetchAdminUsers();
-        const data = res.data?.data;
-        if (data) setUsers(data);
-      } catch {
-        // ابقِ على البيانات الوهمية
+        // جلب البيانات بشكل آمن، سواء كانت داخل data.data أو مجرد data
+        const data = res.data?.data || res.data;
+        
+        // التحقق الجذري: هل البيانات القادمة هي مصفوفة (قائمة) فعلاً؟
+        if (Array.isArray(data)) {
+          setUsers(data);
+        } else {
+          console.warn("البيانات المستلمة ليست مصفوفة، تم الاحتفاظ بالبيانات الوهمية", data);
+          // إذا لم تكن مصفوفة، نبقي على البيانات الوهمية ولا نحدث الخطأ
+        }
+      } catch (err) {
+        console.warn("خطأ في جلب المستخدمين، تم الاحتفاظ بالبيانات الوهمية", err);
       } finally {
         setLoading(false);
       }
@@ -69,80 +77,93 @@ useEffect(() => {
     loadUsers();
   }, []);
 
-  // فتح نافذة إضافة مستخدم
   const openAdd = () => {
     setEditingUser(null);
     setFormData({ name: '', email: '', phone: '', type: 'client', password: '' });
     setShowModal(true);
   };
 
-  // فتح نافذة تعديل مستخدم
   const openEdit = (user) => {
     setEditingUser(user);
-    setFormData({ name: user.name, email: user.email, phone: user.phone, type: user.type, password: '' });
+    const displayFullName = user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || '';
+    setFormData({ name: displayFullName, email: user.email || '', phone: user.phone || '', type: user.type || 'client', password: '' });
     setShowModal(true);
   };
 
-  // حفظ (إضافة/تعديل)
   const handleSave = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.email) {
       showToast('error', 'يرجى تعبئة الاسم والبريد الإلكتروني');
       return;
     }
+    
+    // التأكد من أن users مصفوفة قبل التعديل عليها
+    const safeUsersList = Array.isArray(users) ? users : [];
+
     try {
       if (editingUser) {
         await updateAdminUser(editingUser.id, formData);
-        setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
+        setUsers(safeUsersList.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
         showToast('success', '✅ تم تعديل بيانات المستخدم بنجاح');
       } else {
         await createAdminUser(formData);
         const newUser = { id: Date.now(), ...formData, status: 'active', joined: new Date().toISOString().split('T')[0] };
-        setUsers([newUser, ...users]);
+        setUsers([newUser, ...safeUsersList]);
         showToast('success', '✅ تم إضافة المستخدم بنجاح');
       }
     } catch {
-      // معالجة محلية عند فشل الباك
       if (editingUser) {
-        setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
+        setUsers(safeUsersList.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
         showToast('success', '✅ تم تعديل بيانات المستخدم بنجاح');
       } else {
         const newUser = { id: Date.now(), ...formData, status: 'active', joined: new Date().toISOString().split('T')[0] };
-        setUsers([newUser, ...users]);
+        setUsers([newUser, ...safeUsersList]);
         showToast('success', '✅ تم إضافة المستخدم بنجاح');
       }
     }
     setShowModal(false);
   };
 
-  // حظر/تفعيل
   const handleToggleStatus = async (user) => {
     const newStatus = user.status === 'active' ? 'blocked' : 'active';
+    const safeUsersList = Array.isArray(users) ? users : [];
     try {
       await toggleUserStatus(user.id);
     } catch {
       // محلياً
     }
-    setUsers(users.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
-    showToast('info', newStatus === 'blocked' ? `تم حظر ${user.name}` : `تم تفعيل ${user.name}`);
+    setUsers(safeUsersList.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+    showToast('info', newStatus === 'blocked' ? `تم حظر الحساب` : `تم تفعيل الحساب`);
   };
 
-  // حذف
   const handleDelete = async (user) => {
-    if (!window.confirm(`هل أنت متأكد من حذف المستخدم "${user.name}"؟`)) return;
+    const displayFullName = user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'هذا المستخدم';
+    if (!window.confirm(`هل أنت متأكد من حذف ${displayFullName}؟`)) return;
+    
+    const safeUsersList = Array.isArray(users) ? users : [];
     try {
       await deleteAdminUser(user.id);
     } catch {
       // محلياً
     }
-    setUsers(users.filter(u => u.id !== user.id));
+    setUsers(safeUsersList.filter(u => u.id !== user.id));
     showToast('success', '✅ تم حذف المستخدم بنجاح');
   };
 
-  // التصفية
-  const filteredUsers = users.filter(u => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === 'all' || u.type === typeFilter;
+  // --- الحل الجذري لمنع خطأ users.filter is not a function ---
+  // نضمن دائماً أن المتغير safeUsers هو مصفوفة، حتى لو كان users فارغاً أو كائناً
+  const safeUsers = Array.isArray(users) ? users : [];
+  
+  const filteredUsers = safeUsers.filter(u => {
+    const userName = (u.name || `${u.first_name || ''} ${u.last_name || ''}`).trim() || '';
+    const userEmail = u.email || '';
+    const uType = u.type || u.role || 'client';
+
+    const matchSearch = userName.toLowerCase().includes(search.toLowerCase()) || 
+                        userEmail.toLowerCase().includes(search.toLowerCase());
+                        
+    const matchType = typeFilter === 'all' || uType === typeFilter;
+    
     return matchSearch && matchType;
   });
 
@@ -150,7 +171,6 @@ useEffect(() => {
     <div className="mx-auto" style={{ maxWidth: '100%' }}>
       {toast && <div className={`toast-custom toast-${toast.type}`}>{toast.message}</div>}
 
-      {/* رأس الواجهة */}
       <div className="admin-section-header">
         <div>
           <h3><FaUsers className="ms-2 text-warning" /> إدارة حسابات المستخدمين</h3>
@@ -161,7 +181,6 @@ useEffect(() => {
         </button>
       </div>
 
-      {/* شريط البحث والتصفية */}
       <div className="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-white">
         <div className="row g-3 align-items-center">
           <div className="col-md-6">
@@ -190,7 +209,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* جدول المستخدمين */}
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
         {loading ? (
           <div className="text-center py-5"><FaSpinner className="fa-spin fs-1 text-warning" /></div>
@@ -208,52 +226,59 @@ useEffect(() => {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map(user => (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0" style={{ width: '42px', height: '42px', background: 'linear-gradient(135deg,#1b2a47,#ff8a00)' }}>
-                          {user.name.charAt(0)}
+                {filteredUsers.map(user => {
+                  const displayFullName = (user.name || `${user.first_name || ''} ${user.last_name || ''}`).trim() || 'بدون اسم';
+                  const displayType = user.type || user.role || 'client';
+                  const displayPhone = user.phone || 'غير متوفر';
+                  const displayDate = user.joined || (user.created_at ? String(user.created_at).split('T')[0] : 'غير معروف');
+
+                  return (
+                    <tr key={user.id}>
+                      <td>
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0" style={{ width: '42px', height: '42px', background: 'linear-gradient(135deg,#1b2a47,#ff8a00)' }}>
+                            {displayFullName.charAt(0) || 'م'}
+                          </div>
+                          <div>
+                            <div className="fw-bold text-dark">{displayFullName}</div>
+                            <div className="text-muted small fw-semibold" dir="ltr">{user.email || 'بدون بريد'}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="fw-bold text-dark">{user.name}</div>
-                          <div className="text-muted small fw-semibold" dir="ltr">{user.email}</div>
+                      </td>
+                      <td>
+                        <span className="badge bg-light text-dark fw-bold d-inline-flex align-items-center gap-1" style={{ fontSize: '14px', padding: '6px 12px' }}>
+                          {typeIcons[displayType] || <FaUserTie />} {typeLabels[displayType] || displayType}
+                        </span>
+                      </td>
+                      <td className="fw-semibold text-muted" dir="ltr">{displayPhone}</td>
+                      <td className="fw-semibold text-muted">{displayDate}</td>
+                      <td>
+                        {user.status === 'active' ? (
+                          <span className="admin-badge admin-badge-active"><FaCheckCircle /> نشط</span>
+                        ) : (
+                          <span className="admin-badge admin-badge-blocked"><FaBan /> محظور</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="d-flex justify-content-center gap-2">
+                          <button className="btn btn-sm btn-outline-primary" title="تعديل" onClick={() => openEdit(user)}>
+                            <FaEdit />
+                          </button>
+                          <button
+                            className={`btn btn-sm ${user.status === 'active' ? 'btn-outline-danger' : 'btn-outline-success'} `}
+                            title={user.status === 'active' ? 'حظر' : 'تفعيل'}
+                            onClick={() => handleToggleStatus(user)}
+                          >
+                            {user.status === 'active' ? <FaBan /> : <FaCheckCircle />}
+                          </button>
+                          <button className="btn btn-sm btn-outline-danger" title="حذف" onClick={() => handleDelete(user)}>
+                            <FaTrashAlt />
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge bg-light text-dark fw-bold d-inline-flex align-items-center gap-1" style={{ fontSize: '14px', padding: '6px 12px' }}>
-                        {typeIcons[user.type] || <FaUserTie />} {typeLabels[user.type] || user.type}
-                      </span>
-                    </td>
-                    <td className="fw-semibold text-muted" dir="ltr">{user.phone}</td>
-                    <td className="fw-semibold text-muted">{user.joined}</td>
-                    <td>
-                      {user.status === 'active' ? (
-                        <span className="admin-badge admin-badge-active"><FaCheckCircle /> نشط</span>
-                      ) : (
-                        <span className="admin-badge admin-badge-blocked"><FaBan /> محظور</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="d-flex justify-content-center gap-2">
-                        <button className="btn btn-sm btn-outline-primary" title="تعديل" onClick={() => openEdit(user)}>
-                          <FaEdit />
-                        </button>
-                        <button
-                          className={`btn btn-sm ${user.status === 'active' ? 'btn-outline-danger' : 'btn-outline-success'} `}
-                          title={user.status === 'active' ? 'حظر' : 'تفعيل'}
-                          onClick={() => handleToggleStatus(user)}
-                        >
-                          {user.status === 'active' ? <FaBan /> : <FaCheckCircle />}
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" title="حذف" onClick={() => handleDelete(user)}>
-                          <FaTrashAlt />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -266,7 +291,6 @@ useEffect(() => {
         )}
       </div>
 
-      {/* ===== نافذة إضافة/تعديل مستخدم ===== */}
       {showModal && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setShowModal(false)}>
           <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>

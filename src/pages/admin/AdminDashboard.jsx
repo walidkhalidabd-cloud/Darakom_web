@@ -14,11 +14,11 @@ import ComplaintsTab from './partials/ComplaintsTab';
 import SiteSettingsTab from './partials/SiteSettingsTab';
 
 const AdminDashboard = () => {
-  // الواجهة الافتراضية
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // حالة القائمة للجوال
 
   const getTabName = () => {
-const tabs = {
+    const tabs = {
       'dashboard': 'لوحة التحكم',
       'provider-requests': 'طلبات مزودي الخدمة',
       'users': 'إدارة المستخدمين',
@@ -31,25 +31,30 @@ const tabs = {
   };
 
   return (
-    <div className="container-fluid p-0" style={{ fontFamily: "'Tajawal', sans-serif", backgroundColor: '#f4f6f9', minHeight: '100vh' }}>
-      <div className="row g-0 flex-nowrap" style={{ minHeight: '100vh' }}>
-        {/* القائمة الجانبية */}
-        <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    // التعديل هنا: استخدام height: 100vh و overflow: hidden
+    <div className="d-flex" style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f4f6f9', fontFamily: "'Tajawal', sans-serif" }} dir="rtl">
+      
+      {/* القائمة الجانبية */}
+      <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} isSidebarOpen={isSidebarOpen} />
 
-        {/* منطقة المحتوى */}
-        <div className="col overflow-auto" style={{ height: '100vh' }}>
-          <AdminTopbar activeTabName={getTabName()} setActiveTab={setActiveTab} />
+      {/* منطقة المحتوى */}
+      <div className="flex-grow-1 d-flex flex-column" style={{ overflowX: 'hidden' }}>
+        <AdminTopbar 
+            activeTabName={getTabName()} 
+            setActiveTab={setActiveTab} 
+            isSidebarOpen={isSidebarOpen} 
+            setIsSidebarOpen={setIsSidebarOpen} 
+        />
 
-          <div className="p-4 p-md-5">
-{activeTab === 'dashboard' && <AdminDashboardTab setActiveTab={setActiveTab} />}
+        <main className="flex-grow-1 p-4 p-md-5" style={{ overflowY: 'auto' }}>
+            {activeTab === 'dashboard' && <AdminDashboardTab setActiveTab={setActiveTab} />}
             {activeTab === 'provider-requests' && <ProviderRequestsTab />}
             {activeTab === 'users' && <UsersTab />}
             {activeTab === 'projects' && <ProjectsTab />}
             {activeTab === 'offers' && <OffersTab />}
             {activeTab === 'complaints' && <ComplaintsTab />}
             {activeTab === 'settings' && <SiteSettingsTab />}
-          </div>
-        </div>
+        </main>
       </div>
     </div>
   );
