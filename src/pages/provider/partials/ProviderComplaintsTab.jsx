@@ -3,67 +3,69 @@ import {
   FaExclamationTriangle, FaCheckCircle, FaClock, FaTimesCircle, 
   FaUserTie, FaHardHat, FaPlus, FaPaperPlane, FaSpinner
 } from 'react-icons/fa';
-import { fetchComplaints, submitComplaint } from '../../../services/api/providerApi';
+import { fetchComplaints, submitComplaint, fetchProviderProjects } from '../../../services/api/providerApi';
 import './provider-tabs.css';
 
 const ProviderComplaintsTab = () => {
-    // بيانات وهمية للمشاريع النشطة لجلب أسماء العملاء والمشاريع المرتبطة
-    const activeProjectsList = [
-        { id: 101, title: 'بناء عظم - مساحة 400م', clientName: 'أحمد سليمان' },
-        { id: 102, title: 'ملحق خارجي 60م', clientName: 'أحمد سليمان' },
-        { id: 103, title: 'تشطيب شقة 150م', clientName: 'خالد عبدالله' },
-        { id: 104, title: 'تصميم داخلي لفيلا', clientName: 'سارة ناصر' }
-    ];
-
-    // استخراج أسماء العملاء بدون تكرار
-    const uniqueClients = [...new Set(activeProjectsList.map(p => p.clientName))];
-
-    // بيانات وهمية للشكاوي المقدمة سابقاً
+    const [activeProjects, setActiveProjects] = useState([]);
     const [complaints, setComplaints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [sending, setSending] = useState(false);
     const [toast, setToast] = useState(null);
     
+    // تم التعديل لتخزين الـ IDs بدلاً من الأسماء لتتوافق مع الباك إند
     const [formData, setFormData] = useState({
-        clientName: '',
-        projectTitle: '',
-        description: ''
+        projectId: '',
+        clientId: '',
+        description: '' // سيتم إرسالها باسم text
     });
 
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            // جلب الشكاوى والمشاريع الحقيقية في نفس الوقت
+            const [complaintsRes, projectsRes] = await Promise.all([
+                fetchComplaints().catch(() => ({ data: { data: [] } })),
+                fetchProviderProjects().catch(() => ({ data: { data: [] } }))
+            ]);
+
+            // تهيئة المشاريع لاستخدامها في القائمة المنسدلة
+            const projectsData = projectsRes.data?.data?.data || projectsRes.data?.data || [];
+            setActiveProjects(Array.isArray(projectsData) ? projectsData : []);
+
+            // تهيئة الشكاوى الواردة من الباك إند
+            const complaintsData = complaintsRes.data?.data || [];
+            const formattedComplaints = complaintsData.map(c => {
+                // محاولة جلب اسم العميل واسم المشروع من العلاقات المرجعة
+                let clientName = 'غير معروف';
+                if (c.project && c.project.client) {
+                    clientName = c.project.client.first_name ? `${c.project.client.first_name} ${c.project.client.last_name || ''}` : (c.project.client.name || 'غير معروف');
+                } else if (c.against_user) {
+                    clientName = c.against_user.first_name ? `${c.against_user.first_name} ${c.against_user.last_name || ''}` : (c.against_user.name || 'غير معروف');
+                }
+
+                return {
+                    id: c.id,
+                    clientName: clientName,
+                    projectTitle: c.project?.title || 'غير محدد',
+                    date: c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : 'غير محدد',
+                    status: c.status || 'pending',
+                    description: c.text || '', // الباك يعيدها باسم text
+                    adminReply: c.admin_response || null // الباك يعيدها باسم admin_response
+                };
+            });
+            
+            setComplaints(formattedComplaints);
+        } catch (err) {
+            console.error('خطأ في جلب البيانات:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const load = async () => {
-            setLoading(true);
-            try {
-                const res = await fetchComplaints();
-                setComplaints(res.data?.data || []);
-            } catch (err) {
-                console.warn('⚠️ API غير متاح:', err.message);
-                setComplaints([
-                    {
-                        id: 1,
-                        clientName: 'أحمد سليمان',
-                        projectTitle: 'بناء عظم - مساحة 400م',
-                        date: '2026/06/15',
-                        status: 'pending',
-                        description: 'العميل متأخر في سداد الدفعة المستحقة للمرحلة الثانية لأكثر من أسبوعين ولم يستجب للاتصالات.',
-                        adminReply: null 
-                    },
-                    {
-                        id: 2,
-                        clientName: 'خالد عبدالله',
-                        projectTitle: 'تشطيب شقة 150م',
-                        date: '2026/04/10',
-                        status: 'resolved',
-                        description: 'العميل يطلب إضافات وتعديلات خارج نطاق العقد المتفق عليه ويرفض دفع التكاليف الإضافية.',
-                        adminReply: 'تم التواصل مع العميل وتوضيح بنود العقد، وتم الاتفاق على تسديد رسوم التعديلات الإضافية. تم إغلاق الشكوى بنجاح.'
-                    }
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
+        loadData();
     }, []);
 
     const showToast = (type, message) => {
@@ -71,16 +73,15 @@ const ProviderComplaintsTab = () => {
         setTimeout(() => setToast(null), 3000);
     };
 
-    // معالجة اختيار العميل لتحديد المشروع تلقائياً أو إظهار قائمة المشاريع
-    const handleClientSelect = (e) => {
-        const selectedClient = e.target.value;
-        const clientProjects = activeProjectsList.filter(p => p.clientName === selectedClient);
+    // معالجة اختيار المشروع لتعيين الـ Client ID تلقائياً
+    const handleProjectSelect = (e) => {
+        const selectedProjectId = e.target.value;
+        const selectedProject = activeProjects.find(p => p.id.toString() === selectedProjectId);
         
         setFormData({
             ...formData,
-            clientName: selectedClient,
-            // إذا كان للعميل مشروع واحد، ضعه تلقائياً، وإلا اتركه فارغاً ليختاره المستخدم
-            projectTitle: clientProjects.length === 1 ? clientProjects[0].title : ''
+            projectId: selectedProjectId,
+            clientId: selectedProject?.client_id || selectedProject?.client?.id || ''
         });
     };
 
@@ -88,26 +89,24 @@ const ProviderComplaintsTab = () => {
         e.preventDefault();
         setSending(true);
         try {
-            await submitComplaint(formData);
+            // تجهيز البيانات بالأسماء التي يطلبها الباك إند
+            const payload = {
+                text: formData.description,
+                project_id: formData.projectId,
+                against_user_id: formData.clientId
+            };
+
+            await submitComplaint(payload);
+            showToast('success', '✅ تم إرسال الشكوى بنجاح! سيتم مراجعتها قريباً.');
+            setShowForm(false);
+            setFormData({ projectId: '', clientId: '', description: '' });
+            loadData(); // إعادة جلب البيانات لتحديث القائمة
         } catch (err) {
-            console.warn('⚠️ API غير متاح:', err.message);
+            console.error(err);
+            showToast('error', '❌ فشل إرسال الشكوى، يرجى المحاولة لاحقاً.');
+        } finally {
+            setSending(false);
         }
-        
-        const newComplaint = {
-            id: Date.now(),
-            clientName: formData.clientName,
-            projectTitle: formData.projectTitle,
-            description: formData.description,
-            date: new Date().toISOString().slice(0, 10).replace(/-/g, '/'),
-            status: 'pending',
-            adminReply: null
-        };
-        
-        setComplaints([newComplaint, ...complaints]);
-        showToast('success', '✅ تم إرسال الشكوى بنجاح! سيتم مراجعتها قريباً.');
-        setShowForm(false);
-        setFormData({ clientName: '', projectTitle: '', description: '' });
-        setSending(false);
     };
 
     const getStatusBadge = (status) => {
@@ -115,18 +114,20 @@ const ProviderComplaintsTab = () => {
             case 'pending': 
                 return <span className="badge-pending rounded-pill d-inline-flex align-items-center gap-1 fs-6"><FaClock /> قيد المراجعة</span>;
             case 'resolved': 
-                return <span className="badge-resolved rounded-pill d-inline-flex align-items-center gap-1 fs-6"><FaCheckCircle /> تم الحل</span>;
+            case 'closed':
+                return <span className="badge-resolved rounded-pill d-inline-flex align-items-center gap-1 fs-6"><FaCheckCircle /> تمت المعالجة</span>;
             case 'rejected': 
-                return <span className="badge-rejected rounded-pill d-inline-flex align-items-center gap-1 fs-6"><FaTimesCircle /> مغلقة (مرفوضة)</span>;
+                return <span className="badge-rejected rounded-pill d-inline-flex align-items-center gap-1 fs-6"><FaTimesCircle /> مرفوضة</span>;
             default: 
-                return null;
+                return <span className="badge bg-secondary rounded-pill d-inline-flex align-items-center gap-1 fs-6">{status}</span>;
         }
     };
 
     const getBorderColor = (status) => {
         switch(status) {
             case 'pending': return 'border-warning';
-            case 'resolved': return 'border-success';
+            case 'resolved':
+            case 'closed': return 'border-success';
             case 'rejected': return 'border-danger';
             default: return 'border-secondary';
         }
@@ -143,9 +144,8 @@ const ProviderComplaintsTab = () => {
 
     return (
         <div className="mx-auto" style={{ maxWidth: '100%' }}>
-            {toast && <div className={`toast-custom toast-${toast.type}`}>{toast.message}</div>}
+            {toast && <div className={`toast-custom toast-${toast.type === 'error' ? 'danger' : toast.type}`}>{toast.message}</div>}
 
-            {/* عنوان الواجهة */}
             <div className="d-flex justify-content-between align-items-center mb-5 border-bottom pb-3 flex-wrap gap-3">
                 <div>
                     <h3 className="fw-bold text-dark mb-1">سجل الشكاوى <FaExclamationTriangle className="text-danger ms-2" /></h3>
@@ -156,48 +156,32 @@ const ProviderComplaintsTab = () => {
                     style={{ fontSize: '16px' }}
                     onClick={() => {
                         setShowForm(!showForm);
-                        setFormData({ clientName: '', projectTitle: '', description: '' });
+                        setFormData({ projectId: '', clientId: '', description: '' });
                     }}
                 >
                     {showForm ? <><FaTimesCircle /> إلغاء</> : <><FaPlus /> تقديم شكوى جديدة</>}
                 </button>
             </div>
 
-            {/* نموذج تقديم شكوى */}
             {showForm && (
                 <div className="card-provider border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mb-5 border-end border-4 border-danger">
                     <h4 className="fw-bold text-danger mb-4"><FaExclamationTriangle className="ms-2" /> نموذج تقديم شكوى</h4>
                     <form onSubmit={handleSubmit}>
                         <div className="row g-4">
                             
-                            <div className="col-md-6">
-                                <label className="form-label fw-bold">اسم العميل المشتكى عليه</label>
-                                <select className="form-select form-control-custom" required value={formData.clientName} onChange={handleClientSelect}>
-                                    <option value="">اختر العميل...</option>
-                                    {uniqueClients.map(client => (
-                                        <option key={client} value={client}>{client}</option>
-                                    ))}
+                            <div className="col-md-12">
+                                <label className="form-label fw-bold">اختر المشروع المرتبط بالشكوى</label>
+                                <select className="form-select form-control-custom" required value={formData.projectId} onChange={handleProjectSelect}>
+                                    <option value="">اختر المشروع...</option>
+                                    {activeProjects.map(p => {
+                                        const clientName = p.client?.first_name ? `${p.client.first_name} ${p.client.last_name || ''}` : (p.client?.name || 'عميل');
+                                        return (
+                                            <option key={p.id} value={p.id}>{p.title} (العميل: {clientName})</option>
+                                        );
+                                    })}
                                 </select>
-                            </div>
-                            
-                            <div className="col-md-6">
-                                <label className="form-label fw-bold">المشروع المرتبط</label>
-                                {activeProjectsList.filter(p => p.clientName === formData.clientName).length <= 1 ? (
-                                    <input 
-                                        type="text" 
-                                        className="form-control form-control-custom bg-light" 
-                                        placeholder="سيظهر اسم المشروع تلقائياً" 
-                                        required 
-                                        readOnly 
-                                        value={formData.projectTitle} 
-                                    />
-                                ) : (
-                                    <select className="form-select form-control-custom" required value={formData.projectTitle} onChange={e => setFormData(prev => ({ ...prev, projectTitle: e.target.value }))}>
-                                        <option value="">اختر المشروع...</option>
-                                        {activeProjectsList.filter(p => p.clientName === formData.clientName).map(p => (
-                                            <option key={p.id} value={p.title}>{p.title}</option>
-                                        ))}
-                                    </select>
+                                {activeProjects.length === 0 && (
+                                    <small className="text-danger mt-1 d-block">لا يوجد لديك مشاريع نشطة لتقديم شكوى مرتبطة بها.</small>
                                 )}
                             </div>
                             
@@ -209,7 +193,7 @@ const ProviderComplaintsTab = () => {
                             
                             <div className="col-12 text-center mt-4">
                                 <button type="submit" className="btn fw-bold d-inline-flex align-items-center gap-2 px-5 py-3 shadow"
-                                    style={{ backgroundColor: '#dc3545', color: 'white', fontSize: '20px', borderRadius: '12px' }} disabled={sending || !formData.projectTitle}>
+                                    style={{ backgroundColor: '#dc3545', color: 'white', fontSize: '20px', borderRadius: '12px' }} disabled={sending || !formData.projectId}>
                                     {sending ? <><FaSpinner className="fa-spin" /> جاري الإرسال...</> : <><FaPaperPlane /> إرسال الشكوى</>}
                                 </button>
                             </div>
@@ -218,7 +202,6 @@ const ProviderComplaintsTab = () => {
                 </div>
             )}
 
-            {/* عرض بطاقات الشكاوى */}
             <div className="d-flex flex-column gap-4">
                 {complaints.length > 0 ? complaints.map(complaint => (
                     <div key={complaint.id} className={`card-provider border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white border-end border-4 ${getBorderColor(complaint.status)}`}>

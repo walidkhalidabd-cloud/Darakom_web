@@ -1,41 +1,119 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaGlobe, FaLock, FaMapMarkerAlt, FaCalendarAlt, FaBuilding, FaChevronLeft, FaUserTie, FaSpinner } from 'react-icons/fa';
+import { fetchPublicTenders, fetchPrivateTenders, declineInvitation } from '../../../services/api/providerApi';
 import TenderDetails from './TenderDetails';
 import SubmitOffer from './SubmitOffer';
 import './provider-tabs.css';
 
 const TendersTab = () => {
     const [activeSection, setActiveSection] = useState('general');
-    const [selectedTender, setSelectedTender] = useState(null);
+    const [selectedTenderId, setSelectedTenderId] = useState(null);
+    const [selectedTenderType, setSelectedTenderType] = useState(null); // 'public' or 'private'
     const [showSubmitOffer, setShowSubmitOffer] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [tenders, setTenders] = useState({ general: [], private: [] });
 
-    if (showSubmitOffer && selectedTender) {
-        return <SubmitOffer tender={selectedTender} onBack={() => setShowSubmitOffer(false)} />;
-    }
+    const loadTenders = async () => {
+        setLoading(true);
+        try {
+            // جلب المناقصات العامة والخاصة بالتوازي
+            const [publicRes, privateRes] = await Promise.all([
+                fetchPublicTenders().catch(() => ({ data: { data: [] } })),
+                fetchPrivateTenders().catch(() => ({ data: { data: [] } }))
+            ]);
 
-    if (selectedTender) {
-        return <TenderDetails tender={selectedTender} onBack={() => setSelectedTender(null)} onStartOffer={() => setShowSubmitOffer(true)} />;
-    }
+            const publicData = publicRes.data?.data || [];
+            const privateData = privateRes.data?.data || [];
 
-    // تم تحديث البيانات الوهمية لتطابق مدخلات العميل في صفحة إضافة مشروع
-    const tenderData = {
-        general: [
-            { id: 1, status: 'متاح للتقديم', time: 'نُشر منذ ساعتين', title: 'تنفيذ أعمال السباكة والكهرباء لفيلا سكنية', location: 'دمشق', area: '450', deadline: 'بعد 3 أيام', color: '#1b2a47',
-              details: { description: 'نبحث عن مقاول متخصص أو فني ذو خبرة لتنفيذ كافة أعمال السباكة والكهرباء لفيلا سكنية قيد الإنشاء. نرجو الالتزام بالمخططات وتوفير مواد ذات جودة عالية.', providerType: 'فني كهرباء وسباكة', attachments: [{ type: 'image', name: 'مخطط_الدور_الارضي.jpg' }, { type: 'pdf', name: 'جدول_الكميات.pdf' }] }},
-            { id: 2, status: 'متاح للتقديم', time: 'نُشر بالأمس', title: 'بناء مسبح خارجي مع تنسيق الحدائق', location: 'اللاذقية', area: '200', deadline: 'بعد 5 أيام', color: '#1b2a47',
-              details: { description: 'مطلوب شركة مقاولات لتنفيذ مسبح خارجي (OverFlow) بالإضافة إلى أعمال اللاندسكيب وتنسيق الحديقة المحيطة به.', providerType: 'مقاول', attachments: [{ type: 'image', name: 'تصميم_المسبح.png' }] }},
-            { id: 3, status: 'متاح للتقديم', time: 'منذ 5 أيام', title: 'أعمال دهان وتشطيب داخلي', location: 'حلب', area: '550', deadline: 'بعد 7 أيام', color: '#1b2a47',
-              details: { description: 'مطلوب فني دهانات للقيام بأعمال المعجون والدهان لكامل جدران وأسقف العمارة، يشترط الخبرة والنظافة في العمل.', providerType: 'فني دهان', attachments: [] }},
-        ],
-        private: [
-            { id: 4, status: 'دعوة حصرية', time: 'وصلتك منذ 5 ساعات', title: 'تصميم داخلي وتشطيب شقة فاخرة', client: 'شركة الأفق العقارية', location: 'طرطوس', area: '180', deadline: 'يرجى الرد خلال: 48 ساعة', color: '#ff8a00',
-              details: { description: 'دعوة خاصة من شركة الأفق العقارية لتقديم تصميم داخلي متكامل والإشراف على تشطيب شقة فاخرة في مشروع دمر.', providerType: 'مكاتب هندسية وشركات', attachments: [{ type: 'pdf', name: 'مخطط_الشقة_الاوتوكاد.pdf' }] }},
-            { id: 5, status: 'دعوة حصرية', time: 'منذ يوم', title: 'توريد وتركيب سيراميك ورخام', client: 'أ. خالد عبدالله', location: 'حمص', area: '250', deadline: 'يرجى الرد خلال: 24 ساعة', color: '#ff8a00',
-              details: { description: 'دعوة خاصة لتوريد وتركيب رخام أرضيات بورسلان نخب أول للصالات والمجالس.', providerType: 'فني بلاط', attachments: [] }},
-        ]
+            // تنسيق المناقصات العامة
+            const gen = publicData.map(t => ({
+                id: t.id,
+                status: 'متاح للتقديم',
+                time: new Date(t.created_at).toLocaleDateString('ar-EG'),
+                title: t.title || 'مشروع بدون عنوان',
+                location: t.location_details || t.province?.name || 'غير محدد',
+                area: t.area || 'غير محدد',
+                deadline: t.tender_duration ? `${t.tender_duration} ${t.tender_duration_unit === 'day' ? 'يوم' : 'ساعة'}` : 'غير محدد',
+                color: '#1b2a47',
+                type: 'public'
+            }));
+
+            // تنسيق المناقصات الخاصة (الدعوات)
+            const priv = privateData.map(inv => {
+                const t = inv.project; // الدعوة تحتوي على كائن المشروع
+                const clientName = t?.client?.first_name ? `${t.client.first_name} ${t.client.last_name || ''}`.trim() : (t?.client?.name || 'غير معروف');
+                return {
+                    id: inv.id, // نستخدم ID الدعوة لكي نتمكن من رفضها أو قبولها
+                    project_id: t?.id, // ID المشروع الحقيقي لتقديم العرض
+                    status: 'دعوة حصرية',
+                    time: new Date(inv.created_at).toLocaleDateString('ar-EG'),
+                    title: t?.title || 'مشروع بدون عنوان',
+                    client: clientName,
+                    location: t?.location_details || t?.province?.name || 'غير محدد',
+                    area: t?.area || 'غير محدد',
+                    deadline: inv.expires_at ? `ينتهي في: ${new Date(inv.expires_at).toLocaleDateString('ar-EG')}` : 'غير محدد',
+                    color: '#ff8a00',
+                    type: 'private'
+                };
+            });
+
+            setTenders({ general: gen, private: priv });
+        } catch (error) {
+            console.error("خطأ في جلب المناقصات:", error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const currentData = activeSection === 'general' ? tenderData.general : tenderData.private;
+    useEffect(() => {
+        loadTenders();
+    }, []);
+
+    // دالة لرفض الدعوة الخاصة
+    const handleDecline = async (invitationId) => {
+        if (!window.confirm("هل أنت متأكد من رغبتك بالاعتذار عن هذا المشروع؟")) return;
+        try {
+            await declineInvitation(invitationId);
+            alert("✅ تم الاعتذار عن المشروع بنجاح.");
+            loadTenders(); // إعادة التحميل لإزالة الدعوة من القائمة
+        } catch (error) {
+            console.error("خطأ في رفض الدعوة:", error);
+            alert("❌ حدث خطأ أثناء رفض الدعوة.");
+        }
+    };
+
+    const currentData = activeSection === 'general' ? tenders.general : tenders.private;
+
+    // واجهة تقديم العرض (يجب تمرير بيانات المشروع كاملة لها من التفاصيل)
+    if (showSubmitOffer && selectedTenderId) {
+        return <SubmitOffer 
+                    tender={selectedTenderId} // نمرر الـ Object القادم من التفاصيل
+                    onBack={() => setShowSubmitOffer(false)} 
+               />;
+    }
+
+    // واجهة تفاصيل المناقصة
+    if (selectedTenderId) {
+        return <TenderDetails 
+                    tenderId={selectedTenderId.type === 'private' ? selectedTenderId.project_id : selectedTenderId.id} 
+                    tenderType={selectedTenderId.type}
+                    invitationId={selectedTenderId.type === 'private' ? selectedTenderId.id : null} // للاستخدام عند رفض الدعوة من الداخل
+                    onBack={() => setSelectedTenderId(null)} 
+                    onStartOffer={(fullTenderData) => {
+                        setSelectedTenderId(fullTenderData); // نمرر التفاصيل الكاملة لنرسلها لواجهة تقديم العرض
+                        setShowSubmitOffer(true);
+                    }} 
+               />;
+    }
+
+    if (loading) {
+        return (
+            <div className="mx-auto text-center py-5" style={{ maxWidth: '1400px' }}>
+                <FaSpinner className="fa-spin text-warning mb-3" size={50} />
+                <h4 className="fw-bold text-muted">جاري تحميل سوق المناقصات...</h4>
+            </div>
+        );
+    }
 
     return (
         <div className="mx-auto" style={{ maxWidth: '1400px' }}>
@@ -59,7 +137,6 @@ const TendersTab = () => {
                 </button>
             </div>
 
-            {/* Alert */}
             <div className="alert border-0 shadow-sm rounded-4 p-4 mb-4 text-center fw-bold fs-5"
                 style={{ backgroundColor: activeSection === 'general' ? '#e9f2ff' : '#fff4e5', color: activeSection === 'general' ? '#1b2a47' : '#ff8a00' }}>
                 {activeSection === 'general'
@@ -92,14 +169,18 @@ const TendersTab = () => {
                             </div>
 
                             <div className="col-lg-4 text-lg-end text-center">
-                                {/* تمرير الحقول الصحيحة للمكون */}
-                                <button onClick={() => setSelectedTender({ title: t.title, ...t.details, location: t.location, area: t.area, deadline: t.deadline, status: t.status, client: t.client })}
+                                {/* نمرر الـ Object الخاص بالمناقصة بالكامل لفتحه في التفاصيل */}
+                                <button onClick={() => setSelectedTenderId(t)}
                                     className="btn-provider-primary w-100 d-flex align-items-center justify-content-center gap-2 py-3"
                                     style={{ backgroundColor: t.color, fontSize: '18px' }}>
                                     تفاصيل وتقديم عرض <FaChevronLeft className="ms-2" />
                                 </button>
                                 {t.status === 'دعوة حصرية' && (
-                                    <button className="btn btn-outline-danger fw-bold py-2 rounded-pill w-100 mt-2" style={{ fontSize: '16px' }}>
+                                    <button 
+                                        className="btn btn-outline-danger fw-bold py-2 rounded-pill w-100 mt-2" 
+                                        style={{ fontSize: '16px' }}
+                                        onClick={() => handleDecline(t.id)}
+                                    >
                                         الاعتذار عن المشروع
                                     </button>
                                 )}
@@ -107,10 +188,10 @@ const TendersTab = () => {
                         </div>
                     </div>
                 )) : (
-                    <div className="empty-state">
-                        <FaBuilding size={60} />
-                        <h4>لا توجد مناقصات في هذا القسم حالياً</h4>
-                        <p>ستظهر المناقصات الجديدة هنا</p>
+                    <div className="empty-state py-5">
+                        <FaBuilding size={60} className="text-muted opacity-25 mb-3" />
+                        <h4 className="fw-bold text-muted">لا توجد مناقصات في هذا القسم حالياً</h4>
+                        <p className="text-muted fw-semibold">ستظهر المناقصات الجديدة هنا</p>
                     </div>
                 )}
             </div>

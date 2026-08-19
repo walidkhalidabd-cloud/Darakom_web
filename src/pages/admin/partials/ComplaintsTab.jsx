@@ -6,16 +6,9 @@ import {
 import { fetchAdminComplaints, replyToComplaint, closeComplaint } from '../../../services/api/adminApi';
 import './admin-tabs.css';
 
-// بيانات وهمية احتياطية
-const mockComplaints = [
-  { id: 1, fromName: 'أحمد سليمان', againstName: 'مؤسسة البناء الذهبي', projectTitle: 'بناء عظم - مساحة 400م', date: '2026/06/15', status: 'pending', description: 'المقاول تأخر في تسليم المرحلة الثانية لمدة أسبوعين دون عذر مبرر.', adminReply: null },
-  { id: 2, fromName: 'سمر حسن', againstName: 'شركة أطياف للتشطيبات', projectTitle: 'تشطيب شقة 150م', date: '2026/06/10', status: 'pending', description: 'اختلاف في نوعية السيراميك الموردة عن المتفق عليه.', adminReply: null },
-  { id: 3, fromName: 'خالد عبدالله', againstName: 'مكتب الإبداع الهندسي', projectTitle: 'تصميم داخلي لفيلا', date: '2026/05/20', status: 'resolved', description: 'المهندس يطلب مبلغاً إضافياً لتعديل المخطط.', adminReply: 'تم حل النزاع والتوصل لاتفاق بين الطرفين.' },
-  { id: 4, fromName: 'سمر حسن', againstName: 'فني كهرباء - محمد علي', projectTitle: 'أعمال كهرباء', date: '2026/05/05', status: 'closed', description: 'أعمال غير مكتملة وغير مطابقة للمواصفات.', adminReply: 'تم إغلاق الشكوى بعد تنفيذ الإصلاحات المطلوبة.' },
-];
-
 const ComplaintsTab = () => {
-  const [complaints, setComplaints] = useState(mockComplaints);
+  // الاعتماد كلياً على الـ API وتم إزالة البيانات الوهمية
+  const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [replyText, setReplyText] = useState({});
@@ -30,10 +23,16 @@ const ComplaintsTab = () => {
       setLoading(true);
       try {
         const res = await fetchAdminComplaints();
-        const data = res.data?.data;
-        if (data) setComplaints(data);
-      } catch {
-        // ابقِ على البيانات الوهمية
+        // جلب المصفوفة من الاستجابة حسب هيكلية الباك إند
+        const data = res.data?.data || res.data;
+        
+        if (Array.isArray(data)) {
+          setComplaints(data);
+        } else {
+          console.warn("البيانات المستلمة ليست مصفوفة", data);
+        }
+      } catch  {
+        showToast('error', 'حدث خطأ أثناء جلب الشكاوى من الخادم');
       } finally {
         setLoading(false);
       }
@@ -44,7 +43,8 @@ const ComplaintsTab = () => {
   const getStatusBadge = (status) => {
     if (status === 'pending') return <span className="admin-badge admin-badge-pending"><FaClock /> قيد المراجعة</span>;
     if (status === 'resolved') return <span className="admin-badge admin-badge-approved"><FaCheckCircle /> تم الحل</span>;
-    return <span className="admin-badge admin-badge-blocked"><FaTimesCircle /> مغلقة</span>;
+    if (status === 'closed') return <span className="admin-badge admin-badge-blocked"><FaTimesCircle /> مغلقة</span>;
+    return <span className="admin-badge bg-secondary text-white">{status}</span>;
   };
 
   const handleReply = async (complaint) => {
@@ -53,24 +53,40 @@ const ComplaintsTab = () => {
       showToast('error', 'يرجى كتابة نص الرد أولاً');
       return;
     }
+    
     try {
+      // إرسال الرد إلى الباك إند
       await replyToComplaint(complaint.id, { reply: text });
-    } catch {
-      // محلياً
+      
+      // تحديث الواجهة فور نجاح الطلب
+      setComplaints(complaints.map(c => 
+        c.id === complaint.id ? { ...c, status: 'resolved', adminReply: text } : c
+      ));
+      setReplyText({ ...replyText, [complaint.id]: '' });
+      showToast('success', '✅ تم إرسال الرد وحل الشكوى بنجاح');
+      
+    } catch  {
+      showToast('error', 'حدث خطأ أثناء إرسال الرد للإدارة');
     }
-    setComplaints(complaints.map(c => c.id === complaint.id ? { ...c, status: 'resolved', adminReply: text } : c));
-    setReplyText({ ...replyText, [complaint.id]: '' });
-    showToast('success', '✅ تم إرسال الرد وحل الشكوى');
   };
 
   const handleClose = async (complaint) => {
+    const confirmClose = window.confirm("هل أنت متأكد من إغلاق هذه الشكوى بدون رد؟");
+    if (!confirmClose) return;
+
     try {
+      // إرسال طلب الإغلاق للباك إند
       await closeComplaint(complaint.id);
-    } catch {
-      // محلياً
+      
+      // تحديث الواجهة فور نجاح الطلب
+      setComplaints(complaints.map(c => 
+        c.id === complaint.id ? { ...c, status: 'closed' } : c
+      ));
+      showToast('info', 'تم إغلاق الشكوى بنجاح');
+      
+    } catch  {
+      showToast('error', 'حدث خطأ أثناء محاولة إغلاق الشكوى');
     }
-    setComplaints(complaints.map(c => c.id === complaint.id ? { ...c, status: 'closed' } : c));
-    showToast('info', 'تم إغلاق الشكوى');
   };
 
   return (
@@ -92,6 +108,7 @@ const ComplaintsTab = () => {
         <div className="d-flex flex-column gap-4">
           {complaints.map(complaint => (
             <div key={complaint.id} className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white border-end border-4" style={{ borderColor: complaint.status === 'pending' ? '#ff8a00' : complaint.status === 'resolved' ? '#10b981' : '#6c757d' }}>
+              
               {/* التذكرة والحالة */}
               <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
                 <h5 className="fw-bold mb-0" style={{ color: '#1b2a47' }}>تذكرة رقم: #{complaint.id + 1000}</h5>
@@ -104,14 +121,14 @@ const ComplaintsTab = () => {
                   <div className="bg-white p-2 rounded-circle shadow-sm text-secondary"><FaUserTie size={20} /></div>
                   <div>
                     <span className="text-muted small fw-bold d-block">مقدّم الشكوى</span>
-                    <span className="fw-bold text-dark fs-5">{complaint.fromName}</span>
+                    <span className="fw-bold text-dark fs-5">{complaint.fromName || 'غير معروف'}</span>
                   </div>
                 </div>
                 <div className="col-md-6 d-flex align-items-center gap-2">
                   <div className="bg-white p-2 rounded-circle shadow-sm text-secondary"><FaHardHat size={20} /></div>
                   <div>
                     <span className="text-muted small fw-bold d-block">على / المشروع</span>
-                    <span className="fw-bold text-dark fs-5">{complaint.againstName} - {complaint.projectTitle}</span>
+                    <span className="fw-bold text-dark fs-5">{complaint.againstName || 'غير محدد'} - {complaint.projectTitle || 'غير محدد'}</span>
                   </div>
                 </div>
               </div>
@@ -137,7 +154,7 @@ const ComplaintsTab = () => {
                   <textarea
                     className="form-control form-control-admin mb-3"
                     rows="3"
-                    placeholder="اكتب ردك على هذه الشكوى..."
+                    placeholder="اكتب ردك على هذه الشكوى هنا ليتم إرساله وحل المشكلة..."
                     value={replyText[complaint.id] || ''}
                     onChange={e => setReplyText({ ...replyText, [complaint.id]: e.target.value })}
                   />
@@ -146,14 +163,14 @@ const ComplaintsTab = () => {
                       <FaReply /> إرسال الرد وحل الشكوى
                     </button>
                     <button className="btn btn-outline-secondary fw-bold" onClick={() => handleClose(complaint)}>
-                      إغلاق الشكوى
+                      إغلاق الشكوى (بدون رد)
                     </button>
                   </div>
                 </div>
               )}
 
               <div className="text-end mt-4 pt-3 border-top text-muted small fw-bold">
-                تاريخ التقديم: {complaint.date}
+                تاريخ التقديم: {complaint.date || 'غير محدد'}
               </div>
             </div>
           ))}
@@ -162,7 +179,7 @@ const ComplaintsTab = () => {
         <div className="admin-empty">
           <FaExclamationTriangle size={50} />
           <h5>لا توجد شكاوى حالياً</h5>
-          <p>كل شيء تحت السيطرة.</p>
+          <p>كل شيء تحت السيطرة، لا توجد أي شكاوى قيد الانتظار.</p>
         </div>
       )}
     </div>

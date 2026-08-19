@@ -5,87 +5,115 @@ import {
   FaPercentage, FaEye, FaClock, FaCheckDouble,
   FaExclamationTriangle, FaPaperPlane
 } from 'react-icons/fa';
+import { fetchProviderProjects, fetchProjectSteps, submitComplaint } from '../../../services/api/providerApi';
 import './provider-tabs.css';
 
-// استقبال setActiveTab للتنقل بين الواجهات
 const ProviderTrackingTab = ({ setActiveTab }) => {
-  const mockProjects = [
-    { id: 1, title: 'تنفيذ أعمال السباكة والكهرباء لفيلا سكنية', client: 'أحمد سليمان', location: 'دمشق، المزة', start_date: '15 مارس 2026', duration: '6 أشهر', price: '250,000 ل.س', progress: 45, status: 'قيد التنفيذ', currentStage: 'التمديدات الكهربائية الأساسية' },
-    { id: 2, title: 'تشطيب واجهة عمارة سكنية', client: 'خالد عبدالله', location: 'حلب، حي الفردوس', start_date: '1 يناير 2026', duration: '8 أشهر', price: '450,000 ل.س', progress: 100, status: 'مكتمل', currentStage: 'تم التسليم النهائي' },
-    { id: 3, title: 'تصميم داخلي وتشطيب شقة فاخرة', client: 'شركة الأفق العقارية', location: 'اللاذقية، الكورنيش', start_date: '10 أبريل 2026', duration: 'شهرين', price: '85,000 ل.س', progress: 20, status: 'قيد التنفيذ', currentStage: 'تقديم التصاميم الأولية للعميل' },
-    { id: 4, title: 'ترميم وتجديد فيلا كلاسيكية', client: 'أ. سارة ناصر', location: 'حمص، حي الخالدية', start_date: '5 مايو 2026', duration: '4 أشهر', price: '120,000 ل.س', progress: 60, status: 'قيد التنفيذ', currentStage: 'أعمال اللياسة الداخلية' },
-  ];
-
-  const mockStagesData = {
-    1: [
-      { id: 1, name: 'أعمال الهدم والإزالة', completed: true, date: '2026/04/15', description: 'تم إزالة الجدران القديمة والأرضيات وتجهيز الموقع بالكامل.' },
-      { id: 2, name: 'التمديدات الكهربائية والسباكة', completed: true, date: '2026/05/10', description: 'تم تمديد جميع الشبكات الأساسية واختبار ضغط المواسير بنجاح.' },
-      { id: 3, name: 'أعمال اللياسة والمحارة', completed: false, progress: 70, description: 'جارٍ العمل على تغطية الجدران الداخلية والخارجية بالأسمنت.' },
-      { id: 4, name: 'تركيب الأرضيات والبلاط', completed: false, progress: 0, description: 'ستبدأ المرحلة فور الانتهاء من أعمال اللياسة وتجفافها.' },
-    ],
-    2: [
-      { id: 1, name: 'الحفر والأساسات', completed: true, date: '2026/02/10', description: 'تم الحفر وصب القواعد الخرسانية العادية والمسلحة حسب المخطط.' },
-      { id: 2, name: 'بناء الهيكل الخرساني', completed: true, date: '2026/04/20', description: 'تم صب جميع الأعمدة والأسقف لكافة الأدوار.' },
-      { id: 3, name: 'أعمال الطوب والجدران', completed: true, date: '2026/06/15', description: 'تم الانتهاء من بناء كافة الجدران الداخلية والخارجية.' },
-      { id: 4, name: 'التشطيبات الأساسية والتسليم', completed: true, date: '2026/08/01', description: 'تم الانتهاء من المشروع وتسليمه للعميل بنجاح وبدون أي ملاحظات.' },
-    ],
-    3: [
-      { id: 1, name: 'القياسات والمعاينة', completed: true, date: '2026/05/05', description: 'تم زيارة الموقع وأخذ كافة المقاسات اللازمة للبدء بالتصميم.' },
-      { id: 2, name: 'تقديم التصاميم الأولية', completed: false, progress: 60, description: 'جارٍ تجهيز المخططات ثلاثية الأبعاد (3D) لعرضها على العميل.' },
-      { id: 3, name: 'اعتماد التصاميم النهائية', completed: false, progress: 0, description: 'في انتظار مراجعة العميل واعتماد التصميم النهائي للبدء بالتنفيذ.' },
-    ],
-    4: [
-      { id: 1, name: 'تجهيز الموقع', completed: true, date: '2026/05/10', description: 'تم تجهيز الموقع وتأمين المواد الأولية للترميم.' },
-      { id: 2, name: 'أعمال اللياسة الداخلية', completed: false, progress: 60, description: 'جاري العمل على ترميم وتلييس الجدران الداخلية للمبنى.' }
-    ]
-  };
-
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState(null);
   const [view, setView] = useState('list'); 
   const [loading, setLoading] = useState(true);
+  const [loadingSteps, setLoadingSteps] = useState(false);
   const [toast, setToast] = useState(null);
   
   const [complaintText, setComplaintText] = useState('');
 
-  const handleViewProject = useCallback((project) => {
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleViewProject = useCallback(async (project) => {
     setSelectedProject(project);
     setView('details');
-    setSelectedProjectDetails({ stages: mockStagesData[project.id] || mockStagesData[1] });
+    setLoadingSteps(true);
+    try {
+        // جلب خطوات المشروع الفعلية من الباك إند
+        const res = await fetchProjectSteps(project.id);
+        const stepsData = res.data?.data || [];
+        
+        const formattedStages = stepsData.map(s => ({
+            id: s.id,
+            name: s.title || 'مرحلة بدون عنوان',
+            description: s.description || 'لا يوجد وصف',
+            progress: s.progress_percent || 0,
+            completed: s.status === 'completed',
+            date: s.date ? new Date(s.date).toLocaleDateString('ar-EG') : ''
+        }));
+
+        setSelectedProjectDetails({ stages: formattedStages });
+    } catch (err) {
+        console.error("خطأ في جلب خطوات المشروع:", err);
+        setSelectedProjectDetails({ stages: [] });
+        showToast('error', '❌ فشل جلب مراحل المشروع من الخادم.');
+    } finally {
+        setLoadingSteps(false);
+    }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setProjects(mockProjects);
-      
-      const targetProjectStr = localStorage.getItem('openTrackingProject');
-      if (targetProjectStr) {
-          const targetProject = JSON.parse(targetProjectStr);
-          const projectToOpen = mockProjects.find(p => p.title === targetProject.title) || targetProject;
-          handleViewProject(projectToOpen);
-          localStorage.removeItem('openTrackingProject'); 
-      }
-      
-      setLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    const loadProjects = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchProviderProjects();
+            const projectsData = res.data?.data || [];
+            
+            // تنسيق البيانات لتلائم الواجهة
+            const formattedProjects = projectsData.map(p => ({
+                id: p.id,
+                title: p.title || 'بدون عنوان',
+                client: p.client?.first_name ? `${p.client.first_name} ${p.client.last_name || ''}`.trim() : (p.client?.name || 'غير معروف'),
+                location: p.location_details || p.province?.name || 'غير محدد',
+                start_date: p.start_date ? new Date(p.start_date).toLocaleDateString('ar-EG') : 'غير محدد',
+                duration: p.end_date ? 'محدد بتاريخ' : (p.tender_duration ? `${p.tender_duration} ${p.tender_duration_unit === 'day' ? 'يوم' : 'ساعة'}` : 'غير محدد'),
+                price: p.budget ? `${p.budget} ل.س` : 'غير محدد',
+                progress: p.progress_percentage || 0,
+                status: p.execution_status === 'finished' ? 'مكتمل' : (p.execution_status === 'in_progress' ? 'قيد التنفيذ' : 'لم يبدأ'),
+                original: p // الاحتفاظ بالبيانات الأصلية لاستخدامها عند الحاجة (مثل تقديم شكوى)
+            }));
+            
+            setProjects(formattedProjects);
+
+            // التحقق مما إذا كان هناك طلب لفتح مشروع معين من تبويب آخر
+            const targetProjectStr = localStorage.getItem('openTrackingProject');
+            if (targetProjectStr) {
+                const targetProject = JSON.parse(targetProjectStr);
+                const projectToOpen = formattedProjects.find(p => p.id === targetProject.id) || targetProject;
+                handleViewProject(projectToOpen);
+                localStorage.removeItem('openTrackingProject'); 
+            }
+        } catch (err) {
+            console.error("خطأ في جلب المشاريع:", err);
+            showToast('error', '❌ فشل في تحميل المشاريع.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    loadProjects();
   }, [handleViewProject]);
 
   const handleSubmitComplaint = async (e) => {
     e.preventDefault();
     if (!complaintText.trim()) return;
-    alert(`✅ تم إرسال شكواك بخصوص العميل "${selectedProject.client}" إلى إدارة المنصة. سيتم مراجعتها والرد عليك قريباً.`);
-    setView('list');
-    setSelectedProject(null);
-    setSelectedProjectDetails(null);
-    setComplaintText('');
-  };
 
-  const showToast = (type, message) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
+    try {
+        const payload = {
+            text: complaintText,
+            project_id: selectedProject.id,
+            against_user_id: selectedProject.original?.client_id || selectedProject.original?.client?.id
+        };
+        await submitComplaint(payload);
+        showToast('success', `✅ تم إرسال شكواك بخصوص العميل "${selectedProject.client}" بنجاح! سيتم مراجعتها قريباً.`);
+        setView('list');
+        setSelectedProject(null);
+        setSelectedProjectDetails(null);
+        setComplaintText('');
+    } catch (err) {
+        console.error(err);
+        showToast('error', '❌ حدث خطأ أثناء إرسال الشكوى.');
+    }
   };
 
   if (loading) {
@@ -101,7 +129,7 @@ const ProviderTrackingTab = ({ setActiveTab }) => {
 
   return (
     <div className="mx-auto" style={{ maxWidth: '1200px' }}>
-      {toast && <div className={`toast-custom toast-${toast.type}`}>{toast.message}</div>}
+      {toast && <div className={`toast-custom toast-${toast.type === 'error' ? 'danger' : toast.type}`}>{toast.message}</div>}
 
       {/* ==================== 1. واجهة القائمة الرئيسية (List View) ==================== */}
       {view === 'list' && (
@@ -203,40 +231,53 @@ const ProviderTrackingTab = ({ setActiveTab }) => {
             <FaClock className="text-warning" /> الجدول الزمني ومراحل الإنجاز
           </h4>
 
-          <div className="timeline">
-            {(selectedProjectDetails?.stages || []).map((stage, index) => (
-              <div key={stage.id} className="timeline-item">
-                <div className={`timeline-dot ${stage.completed ? 'completed' : (stage.progress || 0) > 0 ? 'in-progress' : 'pending'}`}>
-                  {stage.completed ? <FaCheck size={14} /> : (stage.progress || 0) > 0 ? <FaSpinner className="fa-spin" size={14} /> : index + 1}
-                </div>
-                
-                <div className={`card border-0 rounded-4 p-4 me-5 ${stage.completed ? 'bg-light border border-success border-opacity-25 shadow-sm' : (stage.progress || 0) > 0 ? 'bg-white shadow-sm border-end border-4 border-warning' : 'bg-light opacity-75'}`}>
-                  <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
-                    <div className="flex-grow-1">
-                      <h5 className={`fw-bold mb-2 ${stage.completed ? 'text-success' : 'text-dark'}`}>{stage.name}</h5>
-                      <p className="text-muted fw-semibold mb-0" style={{ fontSize: '16px', lineHeight: '1.6' }}>{stage.description}</p>
-                    </div>
-                    <div className="flex-shrink-0">
-                      {stage.completed && stage.date && (
-                        <span className="badge-resolved rounded-pill fs-6"><FaCheckDouble className="ms-1" /> أُنجزت في: {stage.date}</span>
-                      )}
-                      {!stage.completed && (stage.progress || 0) > 0 && (
-                        <span className="badge-pending rounded-pill fs-6"><FaSpinner className="fa-spin ms-1" /> نسبة المرحلة: {stage.progress}%</span>
-                      )}
-                    </div>
-                  </div>
+          {loadingSteps ? (
+            <div className="text-center py-5">
+                <FaSpinner className="fa-spin text-warning fs-2" />
+                <p className="mt-2 text-muted fw-bold">جاري تحميل خطوات المشروع...</p>
+            </div>
+          ) : (
+            <div className="timeline">
+              {(selectedProjectDetails?.stages || []).length > 0 ? (
+                  selectedProjectDetails.stages.map((stage, index) => (
+                    <div key={stage.id} className="timeline-item">
+                      <div className={`timeline-dot ${stage.completed ? 'completed' : (stage.progress || 0) > 0 ? 'in-progress' : 'pending'}`}>
+                        {stage.completed ? <FaCheck size={14} /> : (stage.progress || 0) > 0 ? <FaSpinner className="fa-spin" size={14} /> : index + 1}
+                      </div>
+                      
+                      <div className={`card border-0 rounded-4 p-4 me-5 ${stage.completed ? 'bg-light border border-success border-opacity-25 shadow-sm' : (stage.progress || 0) > 0 ? 'bg-white shadow-sm border-end border-4 border-warning' : 'bg-light opacity-75'}`}>
+                        <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                          <div className="flex-grow-1">
+                            <h5 className={`fw-bold mb-2 ${stage.completed ? 'text-success' : 'text-dark'}`}>{stage.name}</h5>
+                            <p className="text-muted fw-semibold mb-0" style={{ fontSize: '16px', lineHeight: '1.6' }}>{stage.description}</p>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {stage.completed && stage.date && (
+                              <span className="badge-resolved rounded-pill fs-6"><FaCheckDouble className="ms-1" /> أُنجزت في: {stage.date}</span>
+                            )}
+                            {!stage.completed && (stage.progress || 0) > 0 && (
+                              <span className="badge-pending rounded-pill fs-6"><FaSpinner className="fa-spin ms-1" /> نسبة المرحلة: {stage.progress}%</span>
+                            )}
+                          </div>
+                        </div>
 
-                  {!stage.completed && (stage.progress || 0) > 0 && (
-                    <div className="mt-3">
-                      <div className="progress" style={{ height: '8px', borderRadius: '10px' }}>
-                        <div className="progress-bar bg-warning progress-bar-striped progress-bar-animated" style={{ width: `${stage.progress}%`, borderRadius: '10px' }}></div>
+                        {!stage.completed && (stage.progress || 0) > 0 && (
+                          <div className="mt-3">
+                            <div className="progress" style={{ height: '8px', borderRadius: '10px' }}>
+                              <div className="progress-bar bg-warning progress-bar-striped progress-bar-animated" style={{ width: `${stage.progress}%`, borderRadius: '10px' }}></div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                  ))
+              ) : (
+                  <div className="text-center py-4 text-muted fw-bold bg-light rounded-4">
+                      لا يوجد مراحل أو خطوات مسجلة لهذا المشروع حتى الآن.
+                  </div>
+              )}
+            </div>
+          )}
 
           <div className="d-flex justify-content-center gap-3 mt-5 pt-4 border-top flex-wrap">
             {selectedProject.progress < 100 && (
@@ -244,7 +285,6 @@ const ProviderTrackingTab = ({ setActiveTab }) => {
                 className="btn-provider-orange d-inline-flex align-items-center gap-2 px-5 py-3 shadow" 
                 style={{ fontSize: '18px' }}
                 onClick={() => {
-                    // التعديل هنا: تخزين المشروع والانتقال لتبويب مشاريعي لفتح نافذة الإضافة
                     localStorage.setItem('projectToUpdateStage', JSON.stringify(selectedProject));
                     if (setActiveTab) setActiveTab('projects');
                 }}

@@ -21,22 +21,23 @@ const ProviderReviewsTab = () => {
         const recData = res.data?.data || [];
         
         if (recData.length > 0) {
-            setReceived(recData);
+            // تنسيق البيانات القادمة من الباك إند لتلائم الواجهة الأمامية
+            const formattedData = recData.map(r => ({
+                id: r.id,
+                client_name: r.user ? `${r.user.first_name} ${r.user.last_name || ''}`.trim() : 'عميل غير معروف',
+                client_avatar: r.user?.first_name ? r.user.first_name[0] : 'ع',
+                project_title: r.project?.title || 'مشروع غير محدد',
+                rating: r.rate || 0, // الباك يرسلها كـ rate
+                review_text: r.comment || 'لا يوجد تعليق نصي', // الباك يرسلها كـ comment
+                date: r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG') : 'غير محدد'
+            }));
+            setReceived(formattedData);
         } else {
-            // بيانات وهمية في حال لم يرجع الـ API بيانات
-            setReceived([
-                { id: 1, client_name: 'أحمد سليمان', client_avatar: 'أ', project_title: 'بناء عظم - 400م', rating: 5, review_text: 'مهندس محترف جداً ومخلص في عمله. تم تسليم المشروع قبل الموعد.', date: '2026/05/15' },
-                { id: 2, client_name: 'خالد عبدالله', client_avatar: 'خ', project_title: 'تشطيب شقة 150م', rating: 4, review_text: 'عمل جيد والتزم بالجدول الزمني المتفق عليه.', date: '2026/03/20' },
-                { id: 3, client_name: 'سارة ناصر', client_avatar: 'س', project_title: 'تصميم داخلي لفيلا', rating: 5, review_text: 'تصاميم إبداعية وذوق رفيع! أنصح بالتعامل معه بشدة.', date: '2025/11/10' },
-            ]);
+            setReceived([]); // جعلها فارغة إذا لم تكن هناك بيانات فعلية
         }
-      } catch { 
-        // استخدام البيانات الوهمية عند فشل الاتصال بالـ API
-        setReceived([
-            { id: 1, client_name: 'أحمد سليمان', client_avatar: 'أ', project_title: 'بناء عظم - 400م', rating: 5, review_text: 'مهندس محترف جداً ومخلص في عمله. تم تسليم المشروع قبل الموعد.', date: '2026/05/15' },
-            { id: 2, client_name: 'خالد عبدالله', client_avatar: 'خ', project_title: 'تشطيب شقة 150م', rating: 4, review_text: 'عمل جيد والتزم بالجدول الزمني.', date: '2026/03/20' },
-            { id: 3, client_name: 'سارة ناصر', client_avatar: 'س', project_title: 'تصميم داخلي لفيلا', rating: 5, review_text: 'تصاميم إبداعية وذوق رفيع!', date: '2025/11/10' },
-        ]);
+      } catch (err) { 
+        console.error('خطأ في جلب التقييمات:', err);
+        setError('تعذر جلب التقييمات من الخادم. يرجى المحاولة لاحقاً.');
       } finally {
         setLoading(false);
       }
@@ -86,7 +87,7 @@ const ProviderReviewsTab = () => {
             <div className="row g-3 mb-4 bg-warning bg-opacity-10 p-3 rounded-4 mx-0 border border-warning border-opacity-25">
               <div className="col-md-6 d-flex align-items-center gap-3">
                 <div className="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm" style={{ width: '50px', height: '50px', fontSize: '22px' }}>
-                  {r.client_avatar || 'ع'}
+                  {r.client_avatar}
                 </div>
                 <div>
                   <span className="text-muted small fw-bold d-block">تقييم من العميل</span>

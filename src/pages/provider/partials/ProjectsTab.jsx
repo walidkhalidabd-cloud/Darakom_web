@@ -4,6 +4,7 @@ import {
     FaChartLine, FaUserTie, FaSpinner, FaCheckCircle, FaPercentage, 
     FaArrowRight, FaCheckDouble, FaFileAlt
 } from 'react-icons/fa';
+import { fetchProviderProjects, addReport } from '../../../services/api/providerApi';
 import ImageUploader from '../../../components/ImageUploader';
 import './provider-tabs.css';
 
@@ -12,21 +13,62 @@ const ProjectsTab = ({ setActiveTab }) => {
     const [view, setView] = useState('list'); 
     const [selectedProject, setSelectedProject] = useState(null);
     
+    // حالة المشاريع الفعلية القادمة من الباك إند
+    const [projects, setProjects] = useState({ general: [], private: [] });
+    const [loading, setLoading] = useState(true);
+
     const [reportText, setReportText] = useState('');
     const [progress, setProgress] = useState(0);
     const [uploadedImages, setUploadedImages] = useState([]);
     const [saving, setSaving] = useState(false);
 
-    const projects = {
-        general: [
-            { id: 1, status: 'قيد التنفيذ', statusColor: '#1b2a47', startDate: '15 مارس 2026', title: 'تنفيذ أعمال السباكة والكهرباء لفيلا سكنية', location: 'دمشق، المزة', area: '450م', progress: 45, currentStage: 'التمديدات الكهربائية الأساسية', client: 'أحمد سليمان', duration: '6 أشهر', price: '250,000 ل.س' },
-            { id: 2, status: 'مكتمل', statusColor: '#10b981', startDate: '1 يناير 2026', title: 'تشطيب واجهة عمارة سكنية', location: 'حلب، حي الفردوس', area: '300م', progress: 100, currentStage: 'تم التسليم النهائي', client: 'خالد عبدالله', duration: '8 أشهر', price: '450,000 ل.س' },
-        ],
-        private: [
-            { id: 3, status: 'قيد التنفيذ', statusColor: '#ff8a00', startDate: '10 أبريل 2026', title: 'تصميم داخلي وتشطيب شقة فاخرة', client: 'شركة الأفق العقارية', location: 'اللاذقية، الكورنيش', progress: 20, currentStage: 'تقديم التصاميم الأولية للعميل', duration: 'شهرين', price: '85,000 ل.س' },
-            { id: 4, status: 'قيد التنفيذ', statusColor: '#ff8a00', startDate: '5 مايو 2026', title: 'ترميم وتجديد فيلا كلاسيكية', client: 'أ. سارة ناصر', location: 'حمص، حي الخالدية', progress: 60, currentStage: 'أعمال اللياسة الداخلية', duration: '4 أشهر', price: '120,000 ل.س' },
-        ]
+    // دالة جلب المشاريع من الباك إند
+    const loadProjects = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchProviderProjects();
+            const data = res.data?.data || [];
+            
+            const gen = [];
+            const priv = [];
+
+            data.forEach(p => {
+                const isFinished = p.execution_status === 'finished' || p.status === 'completed';
+                const formatted = {
+                    id: p.id,
+                    status: isFinished ? 'مكتمل' : (p.execution_status === 'in_progress' ? 'قيد التنفيذ' : 'لم يبدأ'),
+                    statusColor: isFinished ? '#10b981' : (p.execution_status === 'in_progress' ? '#1b2a47' : '#ff8a00'),
+                    startDate: p.start_date ? new Date(p.start_date).toLocaleDateString('ar-EG') : 'غير محدد',
+                    title: p.title || 'مشروع بدون عنوان',
+                    location: p.location_details || p.province?.name || 'غير محدد',
+                    area: p.area ? `${p.area} م²` : null,
+                    progress: p.progress_percentage || 0,
+                    currentStage: 'جاري التنفيذ', 
+                    client: p.client?.first_name ? `${p.client.first_name} ${p.client.last_name || ''}`.trim() : (p.client?.name || 'غير معروف'),
+                    duration: p.tender_duration ? `${p.tender_duration} ${p.tender_duration_unit === 'day' ? 'يوم' : 'ساعة'}` : 'غير محدد',
+                    price: p.budget ? `${p.budget} ل.س` : 'غير محدد',
+                    original: p
+                };
+
+                // تصنيف المشروع (عام أو خاص)
+                if (p.invitation_type === 'private') {
+                    priv.push(formatted);
+                } else {
+                    gen.push(formatted);
+                }
+            });
+
+            setProjects({ general: gen, private: priv });
+        } catch (error) {
+            console.error("خطأ في جلب المشاريع:", error);
+        } finally {
+            setLoading(false);
+        }
     };
+
+    useEffect(() => {
+        loadProjects();
+    }, []);
 
     const currentData = activeSection === 'general' ? projects.general : projects.private;
 
@@ -37,15 +79,21 @@ const ProjectsTab = ({ setActiveTab }) => {
         setView('update_stage');
     };
 
-    // التعديل هنا: التقاط التوجيه القادم من تبويب متابعة المشاريع
+    // التقاط التوجيه القادم من تبويب متابعة المشاريع
     useEffect(() => {
         const updateStr = localStorage.getItem('projectToUpdateStage');
         if (updateStr) {
             const proj = JSON.parse(updateStr);
-            handleOpenUpdate(proj);
-            localStorage.removeItem('projectToUpdateStage'); // مسح التخزين
+            // نبحث عن المشروع المطابق لتحديث حالته
+            let targetProj = projects.general.find(p => p.id === proj.id) || projects.private.find(p => p.id === proj.id);
+            if(targetProj) {
+                handleOpenUpdate(targetProj);
+            } else {
+                handleOpenUpdate(proj); // كحالة بديلة
+            }
+            localStorage.removeItem('projectToUpdateStage'); 
         }
-    }, []);
+    }, [projects]); // إعادة التشغيل عند تحميل المشاريع
 
     const handleOpenTimeline = (project) => {
         localStorage.setItem('openTrackingProject', JSON.stringify(project));
@@ -54,20 +102,42 @@ const ProjectsTab = ({ setActiveTab }) => {
         }
     };
 
-    const handleSubmitReport = (e) => {
+    // إرسال التقرير للباك إند
+    const handleSubmitReport = async (e) => {
         e.preventDefault();
         if (!reportText.trim()) return;
         
         setSaving(true);
-        setTimeout(() => {
+        try {
+            const payload = {
+                description: reportText,
+                reported_progress: parseInt(progress)
+            };
+
+            await addReport(selectedProject.id, payload);
+
             alert('✅ تم رفع التقرير وتحديث المرحلة بنجاح! سيتم إشعار العميل بذلك.');
-            setSaving(false);
             setView('list');
             setReportText('');
             setUploadedImages([]);
             setSelectedProject(null);
-        }, 1200);
+            loadProjects(); // إعادة تحميل القائمة لجلب النسبة الجديدة
+        } catch (err) {
+            console.error("خطأ في إضافة التقرير:", err);
+            alert('❌ حدث خطأ أثناء إرسال التقرير. يرجى المحاولة لاحقاً.');
+        } finally {
+            setSaving(false);
+        }
     };
+
+    if (loading) {
+        return (
+            <div className="mx-auto text-center py-5" style={{ maxWidth: '1400px' }}>
+                <FaSpinner className="fa-spin text-warning mb-3" size={50} />
+                <h4 className="fw-bold text-muted">جاري تحميل مشاريعك...</h4>
+            </div>
+        );
+    }
 
     return (
         <div className="mx-auto" style={{ maxWidth: '1400px' }}>
@@ -135,7 +205,7 @@ const ProjectsTab = ({ setActiveTab }) => {
                                             onClick={() => handleOpenUpdate(p)}
                                             disabled={p.progress === 100}
                                         >
-                                            <FaPlusCircle /> إضافة مرحلة منجزة
+                                            <FaPlusCircle /> إضافة تقرير ومرحلة
                                         </button>
                                         <button 
                                             className="btn-provider-outline w-100 d-flex align-items-center justify-content-center gap-2 py-3" 
@@ -148,10 +218,10 @@ const ProjectsTab = ({ setActiveTab }) => {
                                 </div>
                             </div>
                         )) : (
-                            <div className="empty-state">
-                                <FaBuilding size={60} />
-                                <h4>لا توجد مشاريع في هذا القسم</h4>
-                                <p>عند بدء المشاريع ستظهر هنا</p>
+                            <div className="empty-state py-5">
+                                <FaBuilding size={60} className="text-muted opacity-25 mb-3" />
+                                <h4 className="fw-bold text-muted">لا توجد مشاريع في هذا القسم</h4>
+                                <p className="text-muted fw-semibold">عند بدء المشاريع ستظهر هنا</p>
                             </div>
                         )}
                     </div>
@@ -169,19 +239,15 @@ const ProjectsTab = ({ setActiveTab }) => {
                         <div className="bg-warning bg-opacity-10 text-warning p-4 rounded-circle d-inline-flex mb-3">
                             <FaFileAlt size={40} />
                         </div>
-                        <h3 className="fw-bold" style={{ color: '#1b2a47' }}>تحديث المرحلة الحالية</h3>
-                        <p className="text-muted fw-semibold fs-5">قم بكتابة تقرير مفصل حول ما تم إنجازه وإرفاق الصور للعميل</p>
+                        <h3 className="fw-bold" style={{ color: '#1b2a47' }}>تحديث نسبة الإنجاز والتقارير</h3>
+                        <p className="text-muted fw-semibold fs-5">قم بكتابة تقرير مفصل حول ما تم إنجازه لإعلام العميل بتقدم العمل</p>
                     </div>
 
                     <div className="bg-light p-4 rounded-4 border mb-4">
                         <div className="row g-3">
-                            <div className="col-md-6">
+                            <div className="col-md-12 text-center">
                                 <span className="text-muted fw-bold d-block mb-1">المشروع المرتبط:</span>
-                                <h5 className="fw-bold text-dark">{selectedProject.title}</h5>
-                            </div>
-                            <div className="col-md-6 border-start">
-                                <span className="text-muted fw-bold d-block mb-1">المرحلة الحالية المُراد تحديثها:</span>
-                                <h5 className="fw-bold text-warning">{selectedProject.currentStage}</h5>
+                                <h5 className="fw-bold text-dark mb-0">{selectedProject.title}</h5>
                             </div>
                         </div>
                     </div>
@@ -189,11 +255,11 @@ const ProjectsTab = ({ setActiveTab }) => {
                     <form onSubmit={handleSubmitReport}>
                         <div className="row g-4">
                             <div className="col-12">
-                                <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>تقرير الإنجاز المفصل</label>
+                                <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>تقرير الإنجاز المفصل *</label>
                                 <textarea 
                                     className="form-control p-4 bg-light border" 
                                     rows="5" 
-                                    placeholder="اشرح للعميل الخطوات التي قمت بتنفيذها في هذه المرحلة بالتفصيل..."
+                                    placeholder="اشرح للعميل الخطوات التي قمت بتنفيذها حتى الآن بالتفصيل..."
                                     style={{ borderColor: '#e2e8f0', fontSize: '18px', borderRadius: '12px', lineHeight: '1.8' }}
                                     value={reportText}
                                     onChange={(e) => setReportText(e.target.value)}
@@ -215,18 +281,9 @@ const ProjectsTab = ({ setActiveTab }) => {
                                 </div>
                             </div>
 
-                            <div className="col-12">
-                                <label className="form-label fw-bold fs-5 mb-3" style={{ color: '#1b2a47' }}>إرفاق صور وملفات توثيقية</label>
-                                <ImageUploader 
-                                    images={uploadedImages} 
-                                    onChange={setUploadedImages} 
-                                    label="صور ومستندات الإنجاز"
-                                />
-                            </div>
-
                             <div className="col-12 text-center mt-5 pt-4 border-top">
                                 <button type="submit" className="btn-provider-orange d-inline-flex align-items-center justify-content-center gap-2 px-5 py-3 shadow w-100" style={{ fontSize: '22px' }} disabled={saving}>
-                                    {saving ? <><FaSpinner className="fa-spin" /> جاري رفع التقرير...</> : <><FaCheckDouble /> رفع التقرير وتحديث المشروع</>}
+                                    {saving ? <><FaSpinner className="fa-spin" /> جاري رفع التقرير...</> : <><FaCheckDouble /> رفع التقرير وتحديث نسبة المشروع</>}
                                 </button>
                             </div>
                         </div>

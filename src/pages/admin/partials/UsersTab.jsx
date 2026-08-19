@@ -10,22 +10,13 @@ import {
 } from '../../../services/api/adminApi';
 import './admin-tabs.css';
 
-// بيانات وهمية احتياطية
-const mockUsers = [
-  { id: 1, name: 'أحمد سليمان', email: 'ahmed.s@example.com', phone: '0999123456', type: 'client', status: 'active', joined: '2026/01/15' },
-  { id: 2, name: 'م. خالد عبدالله', email: 'khaled.a@arch.sy', phone: '0999345678', type: 'engineer', status: 'active', joined: '2025/11/02' },
-  { id: 3, name: 'مكتب الإبداع الهندسي', email: 'ibdaa@eng.sy', phone: '0999234567', type: 'office', status: 'active', joined: '2025/09/18' },
-  { id: 4, name: 'مؤسسة الأساس المتين', email: 'alass@construct.sy', phone: '0999567890', type: 'contractor', status: 'blocked', joined: '2025/07/25' },
-  { id: 5, name: 'فني كهرباء - محمد علي', email: 'mohd.elec@craft.sy', phone: '0999789012', type: 'craftsman', status: 'active', joined: '2026/02/10' },
-  { id: 6, name: 'سمر حسن', email: 'smar.h@example.com', phone: '0999456123', type: 'client', status: 'active', joined: '2026/03/01' },
-];
-
 const typeLabels = {
   client: 'عميل',
   engineer: 'مهندس',
   office: 'مكتب',
   contractor: 'مقاول',
-  craftsman: 'حرفي'
+  craftsman: 'حرفي',
+  provider: 'مزود خدمة'
 };
 
 const typeIcons = {
@@ -33,11 +24,12 @@ const typeIcons = {
   engineer: <FaHardHat />,
   office: <FaBuilding />,
   contractor: <FaWrench />,
-  craftsman: <FaUsers />
+  craftsman: <FaUsers />,
+  provider: <FaUsers />
 };
 
 const UsersTab = () => {
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -58,18 +50,12 @@ const UsersTab = () => {
       setLoading(true);
       try {
         const res = await fetchAdminUsers();
-        // جلب البيانات بشكل آمن، سواء كانت داخل data.data أو مجرد data
         const data = res.data?.data || res.data;
-        
-        // التحقق الجذري: هل البيانات القادمة هي مصفوفة (قائمة) فعلاً؟
         if (Array.isArray(data)) {
           setUsers(data);
-        } else {
-          console.warn("البيانات المستلمة ليست مصفوفة، تم الاحتفاظ بالبيانات الوهمية", data);
-          // إذا لم تكن مصفوفة، نبقي على البيانات الوهمية ولا نحدث الخطأ
         }
       } catch (err) {
-        console.warn("خطأ في جلب المستخدمين، تم الاحتفاظ بالبيانات الوهمية", err);
+        console.warn("خطأ في جلب المستخدمين", err);
       } finally {
         setLoading(false);
       }
@@ -85,8 +71,13 @@ const UsersTab = () => {
 
   const openEdit = (user) => {
     setEditingUser(user);
-    const displayFullName = user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || '';
-    setFormData({ name: displayFullName, email: user.email || '', phone: user.phone || '', type: user.type || 'client', password: '' });
+    // التعامل الآمن مع البيانات سواء كانت داخل Model User أو Model Profile
+    const displayFullName = user.user?.name || user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || '';
+    const displayEmail = user.user?.email || user.email || '';
+    const displayPhone = user.user?.phone || user.phone || '';
+    const displayType = user.user?.type || user.type || user.role?.name || 'client';
+    
+    setFormData({ name: displayFullName, email: displayEmail, phone: displayPhone, type: displayType, password: '' });
     setShowModal(true);
   };
 
@@ -97,7 +88,6 @@ const UsersTab = () => {
       return;
     }
     
-    // التأكد من أن users مصفوفة قبل التعديل عليها
     const safeUsersList = Array.isArray(users) ? users : [];
 
     try {
@@ -106,58 +96,50 @@ const UsersTab = () => {
         setUsers(safeUsersList.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
         showToast('success', '✅ تم تعديل بيانات المستخدم بنجاح');
       } else {
-        await createAdminUser(formData);
-        const newUser = { id: Date.now(), ...formData, status: 'active', joined: new Date().toISOString().split('T')[0] };
+        const res = await createAdminUser(formData);
+        const newUser = res.data?.data || { id: Date.now(), ...formData, status: 'active', created_at: new Date().toISOString() };
         setUsers([newUser, ...safeUsersList]);
         showToast('success', '✅ تم إضافة المستخدم بنجاح');
       }
     } catch {
-      if (editingUser) {
-        setUsers(safeUsersList.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
-        showToast('success', '✅ تم تعديل بيانات المستخدم بنجاح');
-      } else {
-        const newUser = { id: Date.now(), ...formData, status: 'active', joined: new Date().toISOString().split('T')[0] };
-        setUsers([newUser, ...safeUsersList]);
-        showToast('success', '✅ تم إضافة المستخدم بنجاح');
-      }
+      showToast('error', 'حدث خطأ أثناء حفظ البيانات');
     }
     setShowModal(false);
   };
 
   const handleToggleStatus = async (user) => {
-    const newStatus = user.status === 'active' ? 'blocked' : 'active';
+    const currentStatus = user.user?.status || user.status;
+    const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
     const safeUsersList = Array.isArray(users) ? users : [];
     try {
       await toggleUserStatus(user.id);
+      setUsers(safeUsersList.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+      showToast('info', newStatus === 'blocked' ? `تم حظر الحساب` : `تم تفعيل الحساب`);
     } catch {
-      // محلياً
+      showToast('error', 'حدث خطأ أثناء تغيير الحالة');
     }
-    setUsers(safeUsersList.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
-    showToast('info', newStatus === 'blocked' ? `تم حظر الحساب` : `تم تفعيل الحساب`);
   };
 
   const handleDelete = async (user) => {
-    const displayFullName = user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'هذا المستخدم';
+    const displayFullName = user.user?.name || user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'هذا المستخدم';
     if (!window.confirm(`هل أنت متأكد من حذف ${displayFullName}؟`)) return;
     
     const safeUsersList = Array.isArray(users) ? users : [];
     try {
       await deleteAdminUser(user.id);
+      setUsers(safeUsersList.filter(u => u.id !== user.id));
+      showToast('success', '✅ تم حذف المستخدم بنجاح');
     } catch {
-      // محلياً
+      showToast('error', 'حدث خطأ أثناء الحذف');
     }
-    setUsers(safeUsersList.filter(u => u.id !== user.id));
-    showToast('success', '✅ تم حذف المستخدم بنجاح');
   };
 
-  // --- الحل الجذري لمنع خطأ users.filter is not a function ---
-  // نضمن دائماً أن المتغير safeUsers هو مصفوفة، حتى لو كان users فارغاً أو كائناً
   const safeUsers = Array.isArray(users) ? users : [];
   
   const filteredUsers = safeUsers.filter(u => {
-    const userName = (u.name || `${u.first_name || ''} ${u.last_name || ''}`).trim() || '';
-    const userEmail = u.email || '';
-    const uType = u.type || u.role || 'client';
+    const userName = (u.user?.name || u.name || `${u.first_name || ''} ${u.last_name || ''}`).trim() || '';
+    const userEmail = u.user?.email || u.email || '';
+    const uType = u.user?.type || u.type || u.role?.name || 'client';
 
     const matchSearch = userName.toLowerCase().includes(search.toLowerCase()) || 
                         userEmail.toLowerCase().includes(search.toLowerCase());
@@ -200,6 +182,7 @@ const UsersTab = () => {
             <select className="form-control form-control-admin" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
               <option value="all">كل الأنواع</option>
               <option value="client">عملاء</option>
+              <option value="provider">مزودي خدمة</option>
               <option value="engineer">مهندسين</option>
               <option value="office">مكاتب</option>
               <option value="contractor">مقاولين</option>
@@ -227,10 +210,12 @@ const UsersTab = () => {
               </thead>
               <tbody>
                 {filteredUsers.map(user => {
-                  const displayFullName = (user.name || `${user.first_name || ''} ${user.last_name || ''}`).trim() || 'بدون اسم';
-                  const displayType = user.type || user.role || 'client';
-                  const displayPhone = user.phone || 'غير متوفر';
-                  const displayDate = user.joined || (user.created_at ? String(user.created_at).split('T')[0] : 'غير معروف');
+                  const displayFullName = (user.user?.name || user.name || `${user.first_name || ''} ${user.last_name || ''}`).trim() || 'بدون اسم';
+                  const displayType = user.user?.type || user.type || user.role?.name || 'client';
+                  const displayPhone = user.user?.phone || user.phone || 'غير متوفر';
+                  const displayEmail = user.user?.email || user.email || 'بدون بريد';
+                  const displayDate = user.created_at ? String(user.created_at).split('T')[0] : (user.joined || 'غير معروف');
+                  const displayStatus = user.user?.status || user.status || 'active';
 
                   return (
                     <tr key={user.id}>
@@ -241,7 +226,7 @@ const UsersTab = () => {
                           </div>
                           <div>
                             <div className="fw-bold text-dark">{displayFullName}</div>
-                            <div className="text-muted small fw-semibold" dir="ltr">{user.email || 'بدون بريد'}</div>
+                            <div className="text-muted small fw-semibold" dir="ltr">{displayEmail}</div>
                           </div>
                         </div>
                       </td>
@@ -253,7 +238,7 @@ const UsersTab = () => {
                       <td className="fw-semibold text-muted" dir="ltr">{displayPhone}</td>
                       <td className="fw-semibold text-muted">{displayDate}</td>
                       <td>
-                        {user.status === 'active' ? (
+                        {displayStatus === 'active' ? (
                           <span className="admin-badge admin-badge-active"><FaCheckCircle /> نشط</span>
                         ) : (
                           <span className="admin-badge admin-badge-blocked"><FaBan /> محظور</span>
@@ -265,11 +250,11 @@ const UsersTab = () => {
                             <FaEdit />
                           </button>
                           <button
-                            className={`btn btn-sm ${user.status === 'active' ? 'btn-outline-danger' : 'btn-outline-success'} `}
-                            title={user.status === 'active' ? 'حظر' : 'تفعيل'}
+                            className={`btn btn-sm ${displayStatus === 'active' ? 'btn-outline-danger' : 'btn-outline-success'} `}
+                            title={displayStatus === 'active' ? 'حظر' : 'تفعيل'}
                             onClick={() => handleToggleStatus(user)}
                           >
-                            {user.status === 'active' ? <FaBan /> : <FaCheckCircle />}
+                            {displayStatus === 'active' ? <FaBan /> : <FaCheckCircle />}
                           </button>
                           <button className="btn btn-sm btn-outline-danger" title="حذف" onClick={() => handleDelete(user)}>
                             <FaTrashAlt />

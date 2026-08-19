@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaGlobe, FaLock, FaMoneyBillWave, FaClock, FaEdit, FaTrash, FaUserTie, FaFileInvoiceDollar, FaCheckCircle, FaTimesCircle, FaSpinner } from 'react-icons/fa';
+import { fetchMyOffers, deleteOffer } from '../../../services/api/providerApi';
 import SubmitOffer from './SubmitOffer';
 import './provider-tabs.css';
 
@@ -7,27 +8,88 @@ const OffersTab = () => {
     const [activeSection, setActiveSection] = useState('general');
     const [editOffer, setEditOffer] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
-    const [offers, setOffers] = useState({
-        general: [
-            { id: 1, status: 'قيد المراجعة', time: 'تم التقديم منذ يومين', title: 'تنفيذ أعمال السباكة والكهرباء لفيلا سكنية', amount: '45,000', duration: '30 يوم', canEdit: true },
-            { id: 2, status: 'مرفوض', time: 'تم التقديم الأسبوع الماضي', title: 'بناء مسبح خارجي مع تنسيق الحدائق', amount: '120,000', duration: '45 يوم', canEdit: false },
-            { id: 3, status: 'مقبول', time: 'تم التقديم منذ 10 أيام', title: 'أعمال تمديدات صحية لعمارة', amount: '78,000', duration: '25 يوم', canEdit: false },
-        ],
-        private: [
-            { id: 4, status: 'قيد المراجعة', time: 'تم التقديم منذ 5 ساعات', title: 'تصميم داخلي وتشطيب شقة فاخرة', client: 'شركة الأفق العقارية', amount: '85,000', duration: '60 يوم', canEdit: true },
-            { id: 5, status: 'مقبول', time: 'تم التقديم الأسبوع الماضي', title: 'تركيب سيراميك ورخام', client: 'أ. خالد عبدالله', amount: '32,000', duration: '20 يوم', canEdit: false },
-        ]
-    });
+    const [loading, setLoading] = useState(true);
+    const [offers, setOffers] = useState({ general: [], private: [] });
+
+    const loadOffers = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchMyOffers();
+            const data = res.data?.data || [];
+            
+            const gen = [];
+            const priv = [];
+
+            data.forEach(o => {
+                const clientObj = o.project?.client;
+                const clientName = clientObj?.first_name ? `${clientObj.first_name} ${clientObj.last_name || ''}`.trim() : (clientObj?.name || 'غير معروف');
+                
+                // تحديد مدة العرض
+                let durationText = o.duration;
+                if(o.duration_unit === 'day') durationText += ' يوم';
+                else if(o.duration_unit === 'month') durationText += ' شهر';
+                else if(o.duration_unit === 'year') durationText += ' سنة';
+
+                // ترجمة الحالة
+                let statusAr = 'قيد المراجعة';
+                if(o.status === 'accepted') statusAr = 'مقبول';
+                if(o.status === 'rejected') statusAr = 'مرفوض';
+
+                // استخراج المراحل من التفاصيل إذا كانت محفوظة
+                let parsedDetails = { stages: [], startDate: '' };
+                try {
+                    if (o.details) parsedDetails = JSON.parse(o.details);
+                } catch(e) { /* تجاهل الخطأ في حال لم تكن JSON */ }
+
+                const formatted = {
+                    id: o.id,
+                    status: statusAr,
+                    time: new Date(o.created_at).toLocaleDateString('ar-EG'),
+                    title: o.project?.title || 'مشروع غير محدد',
+                    client: clientName,
+                    amount: o.cost,
+                    duration: durationText,
+                    duration_value: o.duration,
+                    canEdit: o.status === 'pending',
+                    project_id: o.project_id,
+                    stages: parsedDetails.stages || [],
+                    startDate: parsedDetails.startDate || ''
+                };
+
+                if (o.project?.invitation_type === 'private') {
+                    priv.push(formatted);
+                } else {
+                    gen.push(formatted);
+                }
+            });
+
+            setOffers({ general: gen, private: priv });
+        } catch (error) {
+            console.error("خطأ في جلب العروض:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadOffers();
+    }, []);
 
     const currentData = activeSection === 'general' ? offers.general : offers.private;
 
-    // دالة حذف العرض
-    const handleDeleteOffer = (id) => {
-        setOffers(prev => ({
-            ...prev,
-            [activeSection]: prev[activeSection].filter(o => o.id !== id)
-        }));
-        setShowDeleteConfirm(null);
+    const handleDeleteOffer = async (id) => {
+        try {
+            await deleteOffer(id);
+            setOffers(prev => ({
+                ...prev,
+                [activeSection]: prev[activeSection].filter(o => o.id !== id)
+            }));
+        } catch (err) {
+            console.error("فشل حذف العرض:", err);
+            alert("حدث خطأ أثناء حذف العرض.");
+        } finally {
+            setShowDeleteConfirm(null);
+        }
     };
 
     const getStatusIcon = (status) => {
@@ -45,21 +107,28 @@ const OffersTab = () => {
     // عرض واجهة تعديل العرض
     if (editOffer) {
         const tenderData = {
-            id: editOffer.id,
+            id: editOffer.project_id,
             title: editOffer.title,
-            description: '',
-            area: '',
-            location: '',
-            deadline: '',
-            status: editOffer.status
         };
         return (
             <SubmitOffer
                 tender={tenderData}
                 offerData={editOffer}
-                onBack={() => setEditOffer(null)}
+                onBack={() => {
+                    setEditOffer(null);
+                    loadOffers(); // تحديث القائمة بعد العودة من التعديل
+                }}
                 isEditing={true}
             />
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="mx-auto text-center py-5" style={{ maxWidth: '1400px' }}>
+                <FaSpinner className="fa-spin text-warning mb-3" size={50} />
+                <h4 className="fw-bold text-muted">جاري تحميل عروضك...</h4>
+            </div>
         );
     }
 
@@ -96,7 +165,7 @@ const OffersTab = () => {
                                     <span className={`${getStatusClass(o.status)} rounded-pill px-3 py-2 d-inline-flex align-items-center gap-1 fs-6`}>
                                         {getStatusIcon(o.status)} {o.status}
                                     </span>
-                                    <span className="text-muted fw-bold fs-6">{o.time}</span>
+                                    <span className="text-muted fw-bold fs-6">تاريخ التقديم: {o.time}</span>
                                 </div>
                                 <h4 className="fw-bold mb-3" style={{ color: '#1b2a47', fontSize: '26px' }}>{o.title}</h4>
 
@@ -189,10 +258,10 @@ const OffersTab = () => {
                         </div>
                     </div>
                 )) : (
-                    <div className="empty-state">
-                        <FaFileInvoiceDollar size={60} />
-                        <h4>لا توجد عروض مقدمه في هذا القسم</h4>
-                        <p>عند تقديم عروضك ستظهر هنا</p>
+                    <div className="empty-state py-5">
+                        <FaFileInvoiceDollar size={60} className="text-muted opacity-25 mb-3" />
+                        <h4 className="fw-bold text-muted">لا توجد عروض مقدمة في هذا القسم</h4>
+                        <p className="text-muted fw-semibold">عند تقديم عروضك ستظهر هنا</p>
                     </div>
                 )}
             </div>
@@ -201,4 +270,3 @@ const OffersTab = () => {
 };
 
 export default OffersTab;
-

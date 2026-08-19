@@ -6,52 +6,12 @@ import {
   FaPaperclip, FaRegFileImage, FaClock, FaTags,
   FaBuilding, FaMapPin, FaStar, FaBolt
 } from 'react-icons/fa';
-import { fetchAdminProjects, approveProject, rejectProject } from '../../../services/api/adminApi';
+import { fetchAdminProjects, approveProject } from '../../../services/api/adminApi';
+import apiReq from '../../../services/apiReq';
 import './admin-tabs.css';
 
-// تم تحديث البيانات الوهمية لتتطابق تماماً مع الحقول التي يدخلها العميل في استمارة "إضافة مشروع"
-const mockProjects = [
-  { 
-    id: 1, 
-    title: 'بناء عظم لفيلا سكنية', 
-    owner: 'أحمد سليمان', 
-    province: 'دمشق', 
-    detailedAddress: 'المزة، حي الفيلات الغربية، قرب الحديقة',
-    status: 'pending', 
-    date: '2026/08/18', 
-    projectCategory: 'إنشاء',
-    description: 'مطلوب مقاول معتمد للبدء بأعمال الحفر والبناء لهيكل عظمي لفيلا سكنية مكونة من 3 طوابق. المخططات الهندسية جاهزة وتم استخراج كافة التراخيص من البلدية.',
-    area: '400', 
-    requiredProvider: 'مكاتب هندسية وشركات',
-    tenderDuration: '15 يوم',
-    isDirect: false,
-    directProviderName: null,
-    attachments: [
-        { type: 'image', title: 'صورة المخطط', name: 'plan_image.jpg', size: '2.5 MB' }
-    ]
-  },
-  { 
-    id: 2, 
-    title: 'أعمال كهرباء وسباكة لشقة', 
-    owner: 'سمر حسن', 
-    province: 'حلب', 
-    detailedAddress: 'الجميلية، الشارع الرئيسي، بناء السلام',
-    status: 'pending', 
-    date: '2026/08/17', 
-    projectCategory: 'تشطيب',
-    tenderType: 'مستعجل',
-    description: 'عندي مشكلة في تمديدات الكهرباء والسباكة في الحمام والمطبخ وتحتاج إلى صيانة وتجديد كامل بأسرع وقت ممكن.',
-    area: '120', 
-    requiredProvider: 'فني كهرباء', // بناءً على الحرفة
-    tenderDuration: '48 ساعة',
-    isDirect: true,
-    directProviderName: 'محمد علي (فني كهرباء)',
-    attachments: []
-  }
-];
-
 const ProjectsTab = () => {
-  const [projects, setProjects] = useState(mockProjects);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -62,55 +22,101 @@ const ProjectsTab = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await fetchAdminProjects();
-        const data = res.data?.data || res.data;
-        if (Array.isArray(data)) {
-            setProjects(data);
-        }
-      } catch {
-        // الاعتماد على البيانات الوهمية في حال الفشل
-      } finally {
-        setLoading(false);
+  const loadProjects = async () => {
+    setLoading(true);
+    try {
+      const res = await fetchAdminProjects();
+      
+      // معالجة التغليف المزدوج للبيانات بسبب استخدام paginate() في الباك إند
+      const responseData = res.data?.data || res.data;
+      const projectsArray = Array.isArray(responseData?.data) ? responseData.data : (Array.isArray(responseData) ? responseData : []);
+
+      if (projectsArray.length > 0) {
+        const formattedProjects = projectsArray.map(p => {
+          
+          let mappedStatus = p.status || 'pending';
+          if (mappedStatus === 'new') mappedStatus = 'pending';
+          if (mappedStatus === 'open' || mappedStatus === 'active') mappedStatus = 'approved';
+
+          // قراءة اسم العميل بناءً على علاقات الباك إند
+          let clientName = p.client?.name || p.client?.full_name || 'غير معروف';
+          if (!p.client?.name && p.client?.first_name) {
+              clientName = `${p.client.first_name} ${p.client.last_name || ''}`.trim();
+          }
+
+          return {
+            id: p.id,
+            title: p.title || 'بدون عنوان',
+            owner: clientName,
+            province: p.province?.name || 'غير محدد',
+            detailedAddress: p.location_details || 'غير محدد',
+            status: mappedStatus,
+            date: p.created_at ? new Date(p.created_at).toLocaleDateString('ar-EG') : 'غير محدد',
+            projectCategory: p.projectType?.name || (p.work_type === 'construction' ? 'إنشاء' : 'تشطيب'),
+            tenderType: p.tender_type === 'urgent' ? 'مستعجل' : 'عادي',
+            description: p.description || 'لا يوجد وصف',
+            area: p.area || '0',
+            requiredProvider: p.craftsman_type || 'مكاتب هندسية وشركات',
+            tenderDuration: p.tender_duration ? `${p.tender_duration} ${p.tender_duration_unit === 'day' ? 'يوم' : 'ساعة'}` : 'غير محدد',
+            isDirect: p.invitation_type === 'private',
+            directProviderName: p.providerProfile?.user?.name || (p.providerProfile?.user?.first_name ? `${p.providerProfile.user.first_name} ${p.providerProfile.user.last_name || ''}` : 'غير محدد'),
+            rejectReason: p.comment || p.reject_reason || null, // الباك إند يحفظ سبب الرفض في comment
+            attachments: p.documents?.map(doc => ({
+               type: 'image',
+               title: doc.description || 'مرفق',
+               url: doc.path?.startsWith('http') ? doc.path : `http://127.0.0.1:8000/storage/${doc.path}`
+            })) || []
+          };
+        });
+        setProjects(formattedProjects);
+      } else {
+        setProjects([]); 
       }
-    };
-    load();
+    } catch (error) {
+      console.error("خطأ في جلب المشاريع:", error);
+      showToast('danger', 'فشل في تحميل المشاريع.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProjects();
   }, []);
 
   const getStatusBadge = (status) => {
     if (status === 'pending') return <span className="admin-badge admin-badge-pending">قيد المراجعة</span>;
     if (status === 'approved') return <span className="admin-badge admin-badge-approved"><FaCheckCircle /> مقبول (مطروح)</span>;
-    return <span className="admin-badge admin-badge-rejected"><FaTimesCircle /> مرفوض</span>;
+    if (status === 'rejected') return <span className="admin-badge admin-badge-rejected"><FaTimesCircle /> مرفوض</span>;
+    return <span className="admin-badge bg-secondary text-white">{status}</span>;
   };
 
   const handleApprove = async (project) => {
     if(!window.confirm(`هل أنت متأكد من الموافقة على مشروع "${project.title}"؟`)) return;
     
-    const safeProjectsList = Array.isArray(projects) ? projects : [];
     try {
       await approveProject(project.id);
-    } catch {
-      // محلياً
+      showToast('success', `✅ تمت الموافقة! المشروع الآن مطروح.`);
+      loadProjects(); 
+    } catch (error) {
+      console.error("خطأ في القبول:", error);
+      showToast('danger', 'فشل قبول المشروع.');
     }
-    setProjects(safeProjectsList.map(p => p.id === project.id ? { ...p, status: 'approved' } : p));
-    showToast('success', `✅ تمت الموافقة! المشروع الآن مطروح.`);
   };
 
   const handleReject = async (project) => {
     const reason = window.prompt('يرجى كتابة سبب رفض هذا المشروع ليتم إشعار العميل بتعديله:');
     if (!reason) return; 
     
-    const safeProjectsList = Array.isArray(projects) ? projects : [];
     try {
-      await rejectProject(project.id, reason);
-    } catch {
-      // محلياً
+      // إرسال المتغير rejection_reason كما يتوقعه الباك إند تماماً
+      await apiReq.post(`/admin/projects/${project.id}/reject`, { rejection_reason: reason });
+      showToast('info', `تم رفض المشروع وإرسال التنبيه للعميل.`);
+      loadProjects(); 
+    } catch (error) {
+       console.error("خطأ في الرفض:", error);
+       showToast('danger', 'فشل رفض المشروع.');
     }
-    setProjects(safeProjectsList.map(p => p.id === project.id ? { ...p, status: 'rejected', rejectReason: reason } : p));
-    showToast('info', `تم رفض المشروع وإرسال التنبيه للعميل.`);
   };
 
   const safeProjects = Array.isArray(projects) ? projects : [];
@@ -125,7 +131,7 @@ const ProjectsTab = () => {
 
   return (
     <div className="mx-auto" style={{ maxWidth: '100%' }}>
-      {toast && <div className={`toast-custom toast-${toast.type}`}>{toast.message}</div>}
+      {toast && <div className={`toast-custom toast-${toast.type === 'danger' ? 'error' : toast.type}`}>{toast.message}</div>}
 
       <div className="admin-section-header">
         <div>
@@ -167,7 +173,6 @@ const ProjectsTab = () => {
           {filtered.map(project => (
             <div key={project.id} className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white border-end border-4" style={{ borderColor: project.status === 'pending' ? '#ff8a00' : project.status === 'approved' ? '#10b981' : '#ef4444' }}>
               
-              {/* تنبيه الطلب المباشر */}
               {project.isDirect && (
                   <div className="alert d-flex align-items-center gap-3 mb-4 rounded-3 shadow-sm border-0" style={{ backgroundColor: '#fff3cd', color: '#856404' }}>
                       <FaStar size={24} className="text-warning flex-shrink-0" />
@@ -177,7 +182,6 @@ const ProjectsTab = () => {
                   </div>
               )}
 
-              {/* رأس البطاقة - العميل والتاريخ */}
               <div className="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3 pb-3 border-bottom">
                 <div className="d-flex align-items-center gap-3">
                     <div className="bg-light p-3 rounded-circle text-primary">
@@ -196,7 +200,6 @@ const ProjectsTab = () => {
                 </div>
               </div>
 
-              {/* عنوان المشروع */}
               <div className="d-flex align-items-center gap-2 mb-4">
                   <h4 className="fw-bold mb-0" style={{ color: '#1b2a47', fontSize: '24px' }}>
                     {project.title}
@@ -208,7 +211,6 @@ const ProjectsTab = () => {
                   )}
               </div>
 
-              {/* === استمارة بيانات المشروع المأخوذة من العميل === */}
               <div className="bg-light p-4 rounded-4 mb-4 border">
                 <h6 className="fw-bold text-primary mb-4 pb-2 border-bottom d-flex align-items-center gap-2">
                     <FaFileAlt /> بيانات الاستمارة المُرسلة
@@ -225,10 +227,9 @@ const ProjectsTab = () => {
                     </div>
                     <div className="col-md-6 col-lg-4">
                         <span className="text-muted small fw-bold d-flex align-items-center gap-1 mb-1"><FaVectorSquare /> مساحة المشروع</span>
-                        <span className="fw-bold text-dark fs-6">{project.area ? `${project.area} م²` : 'غير محدد'}</span>
+                        <span className="fw-bold text-dark fs-6">{project.area !== '0' ? `${project.area} م²` : 'غير محدد'}</span>
                     </div>
                     
-                    {/* إخفاء نوع المزود المطلوب إذا كان طلباً مباشراً */}
                     {!project.isDirect && (
                         <div className="col-md-6 col-lg-4">
                             <span className="text-muted small fw-bold d-flex align-items-center gap-1 mb-1"><FaBuilding /> المزود / الحرفة المطلوبة</span>
@@ -253,18 +254,17 @@ const ProjectsTab = () => {
                     </div>
                 </div>
 
-                {/* المرفقات (العميل يرفع صور فقط حسب كوده) */}
                 <div>
                     <span className="text-muted small fw-bold d-flex align-items-center gap-1 mb-2"><FaPaperclip /> المرفقات ({project.attachments?.length || 0})</span>
                     {project.attachments && project.attachments.length > 0 ? (
                         <div className="d-flex flex-wrap gap-2">
                             {project.attachments.map((att, i) => (
-                                <div key={i} className="bg-white border rounded-3 p-2 px-3 d-flex align-items-center gap-2 shadow-sm">
+                                <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="bg-white border rounded-3 p-2 px-3 d-flex align-items-center gap-2 shadow-sm text-decoration-none">
                                     <FaRegFileImage className="text-primary fs-4" />
                                     <div className="d-flex flex-column">
                                         <span className="fw-bold text-dark" style={{ fontSize: '13px' }}>{att.title || att.name}</span>
                                     </div>
-                                </div>
+                                </a>
                             ))}
                         </div>
                     ) : (
@@ -273,7 +273,6 @@ const ProjectsTab = () => {
                 </div>
               </div>
 
-              {/* حالة الرفض السابقة */}
               {project.status === 'rejected' && project.rejectReason && (
                 <div className="p-3 rounded-4 mb-4 d-flex align-items-center gap-3" style={{ backgroundColor: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
                   <FaTimesCircle className="text-danger fs-3" />
@@ -284,7 +283,6 @@ const ProjectsTab = () => {
                 </div>
               )}
 
-              {/* أزرار الإدارة */}
               {project.status === 'pending' && (
                 <div className="d-flex justify-content-end gap-3 mt-4 pt-3 border-top flex-wrap">
                   <button className="btn btn-outline-danger fw-bold d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2" onClick={() => handleReject(project)}>

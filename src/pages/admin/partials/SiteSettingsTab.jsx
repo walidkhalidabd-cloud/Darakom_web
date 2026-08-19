@@ -3,30 +3,18 @@ import {
   FaCog, FaSpinner, FaSave, FaBook, FaInfoCircle,
   FaPhoneAlt, FaEnvelope, FaMapMarkerAlt, FaShieldAlt
 } from 'react-icons/fa';
-import { fetchSiteSettings, updateSiteSettings, updateGuidancePage } from '../../../services/api/adminApi';
+import { fetchSiteSettings, updateSiteSettings } from '../../../services/api/adminApi';
 import './admin-tabs.css';
 
-// بيانات وهمية احتياطية
-const mockSettings = {
-  site: {
-    name: 'داركم',
-    tagline: 'خطتك الذكية لبيت أحلامك',
-    description: 'منصتك الموثوقة لإدارة وتطوير مشاريعك الهندسية والمقاولات بكل احترافية.',
-  },
-  contact: {
-    phone: '0999123456',
-    email: 'info@darakom.sy',
-    address: 'دمشق، سوريا'
-  },
-  guidance: {
-    intro: 'كل ما تحتاجه من معلومات، خطوات، ونصائح لبناء مشروعك بنجاح وبأعلى معايير الجودة والتوفير.',
-    general: 'السلامة أولاً، استخراج التراخيص القانونية، اختيار المقاول المعتمد، والحرص على جودة المواد.',
-    tips: 'وضع ميزانية دقيقة مع هامش طوارئ، المقارنة بين عروض الأسعار، والالتزام بالتصميم المعتمد.'
-  }
+// بيانات ابتدائية فارغة (أو وهمية احتياطية) ريثما يتم التحميل من الباك إند
+const defaultSettings = {
+  site: { name: '', tagline: '', description: '' },
+  contact: { phone: '', email: '', address: '' },
+  guidance: { intro: '', general: '', tips: '' }
 };
 
 const SiteSettingsTab = () => {
-  const [settings, setSettings] = useState(mockSettings);
+  const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -41,10 +29,31 @@ const SiteSettingsTab = () => {
       setLoading(true);
       try {
         const res = await fetchSiteSettings();
-        const data = res.data?.data;
-        if (data) setSettings(data);
-      } catch {
-        // ابقِ على البيانات الوهمية
+        // الباك إند يعيد البيانات على شكل { key: value }
+        const data = res.data?.data || res.data;
+        
+        if (data) {
+          // تفريغ البيانات القادمة من الباك إند لتناسب هيكلية الفرونت إند
+          setSettings({
+            site: {
+              name: data.site_name || '',
+              tagline: data.site_slogan || '',
+              description: data.site_description || '',
+            },
+            contact: {
+              phone: data.contact_phone || '',
+              email: data.contact_email || '',
+              address: data.contact_address || ''
+            },
+            guidance: {
+              intro: data.guide_intro || '',
+              general: data.guide_general_instructions || '',
+              tips: data.guide_financial_advice || ''
+            }
+          });
+        }
+      } catch (error) {
+        console.error("فشل جلب الإعدادات من السيرفر:", error);
       } finally {
         setLoading(false);
       }
@@ -68,14 +77,28 @@ const SiteSettingsTab = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateSiteSettings(settings.site);
-      await updateGuidancePage(settings.guidance);
-    } catch {
-      // محلياً
+      // تجهيز الكائن (Payload) بالأسماء التي يتوقعها الباك إند بالضبط في قواعد التحقق (Validation)
+      const payload = {
+        site_name: settings.site.name,
+        site_slogan: settings.site.tagline,
+        site_description: settings.site.description,
+        contact_phone: settings.contact.phone,
+        contact_email: settings.contact.email,
+        contact_address: settings.contact.address,
+        guide_intro: settings.guidance.intro,
+        guide_general_instructions: settings.guidance.general,
+        guide_financial_advice: settings.guidance.tips
+      };
+
+      // إرسال طلب التحديث للباك إند
+      await updateSiteSettings(payload);
+      showToast('success', '✅ تم حفظ جميع إعدادات الموقع بنجاح');
+    } catch (error) {
+      console.error("فشل حفظ الإعدادات:", error);
+      showToast('danger', '❌ حدث خطأ أثناء حفظ الإعدادات، تأكد من صحة البيانات.');
     } finally {
       setSaving(false);
     }
-    showToast('success', '✅ تم حفظ إعدادات الموقع بنجاح');
   };
 
   if (loading) {
@@ -88,7 +111,7 @@ const SiteSettingsTab = () => {
 
   return (
     <div className="mx-auto" style={{ maxWidth: '100%' }}>
-      {toast && <div className={`toast-custom toast-${toast.type}`}>{toast.message}</div>}
+      {toast && <div className={`toast-custom toast-${toast.type === 'danger' ? 'error' : toast.type}`}>{toast.message}</div>}
 
       {/* رأس الواجهة */}
       <div className="admin-section-header">

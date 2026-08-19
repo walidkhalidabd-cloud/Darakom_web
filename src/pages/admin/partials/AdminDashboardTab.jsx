@@ -8,22 +8,15 @@ import {
 import { fetchAdminDashboard } from '../../../services/api/adminApi';
 import './admin-tabs.css';
 
-// بيانات وهمية احتياطية
-const mockStats = {
-  totalUsers: 248,
-  usersByType: {
-    client: 120,
-    engineer: 45,
-    office: 28,
-    contractor: 35,
-    craftsman: 20
-  },
-  projects: { open: 34, completed: 58, suspended: 6 },
-  offers: { total: 142, accepted: 89 }
+// هيكل البيانات الأساسي المطابق للباك إند لمنع أي انهيار
+const initialStats = {
+  users: { total: 0, clients: 0, engineers: 0, offices: 0, contractors: 0, craftsmen: 0 },
+  projects: { total: 0, open: 0, completed: 0, paused: 0 },
+  offers: { total: 0, accepted: 0 }
 };
 
 const AdminDashboardTab = ({ setActiveTab }) => {
-  const [stats, setStats] = useState(mockStats);
+  const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,8 +26,8 @@ const AdminDashboardTab = ({ setActiveTab }) => {
         const res = await fetchAdminDashboard();
         const data = res.data?.data || res.data;
         if (data) setStats(data);
-      } catch {
-        // ابقِ على البيانات الوهمية
+      } catch (err) {
+        console.error("تعذر جلب الإحصائيات", err);
       } finally {
         setLoading(false);
       }
@@ -42,12 +35,13 @@ const AdminDashboardTab = ({ setActiveTab }) => {
     load();
   }, []);
 
+  // تعديل المفاتيح لتتطابق مع الـ Keys القادمة من الباك إند
   const typeCards = [
-    { key: 'client', label: 'عملاء', icon: <FaUserTie />, color: '#0d6efd' },
-    { key: 'engineer', label: 'مهندسين', icon: <FaHardHat />, color: '#6f42c1' },
-    { key: 'office', label: 'مكاتب', icon: <FaBuilding />, color: '#0dcaf0' },
-    { key: 'contractor', label: 'مقاولين', icon: <FaWrench />, color: '#ff8a00' },
-    { key: 'craftsman', label: 'حرفيين', icon: <FaUsers />, color: '#10b981' }
+    { key: 'clients', label: 'عملاء', icon: <FaUserTie />, color: '#0d6efd' },
+    { key: 'engineers', label: 'مهندسين', icon: <FaHardHat />, color: '#6f42c1' },
+    { key: 'offices', label: 'مكاتب', icon: <FaBuilding />, color: '#0dcaf0' },
+    { key: 'contractors', label: 'مقاولين', icon: <FaWrench />, color: '#ff8a00' },
+    { key: 'craftsmen', label: 'حرفيين', icon: <FaUsers />, color: '#10b981' }
   ];
 
   return (
@@ -72,7 +66,7 @@ const AdminDashboardTab = ({ setActiveTab }) => {
           <div className="admin-stat-card p-3 p-md-4 d-flex flex-row align-items-center justify-content-between h-100" style={{ borderBottomColor: '#0d6efd' }}>
             <div>
               <p className="text-muted fw-bold mb-1" style={{ fontSize: '17px' }}>إجمالي المستخدمين</p>
-              <h2 className="fw-bold mb-0 text-primary" style={{ fontSize: '38px' }}>{stats?.totalUsers || 0}</h2>
+              <h2 className="fw-bold mb-0 text-primary" style={{ fontSize: '38px' }}>{stats?.users?.total || 0}</h2>
             </div>
             <div className="bg-primary bg-opacity-10 text-primary p-3 rounded-circle fs-3"><FaUsers /></div>
           </div>
@@ -82,9 +76,7 @@ const AdminDashboardTab = ({ setActiveTab }) => {
           <div className="admin-stat-card p-3 p-md-4 d-flex flex-row align-items-center justify-content-between h-100" style={{ borderBottomColor: '#ff8a00' }}>
             <div>
               <p className="text-muted fw-bold mb-1" style={{ fontSize: '17px' }}>إجمالي المشاريع</p>
-              <h2 className="fw-bold mb-0" style={{ color: '#ff8a00', fontSize: '38px' }}>
-                {(stats?.projects?.open || 0) + (stats?.projects?.completed || 0) + (stats?.projects?.suspended || 0)}
-              </h2>
+              <h2 className="fw-bold mb-0" style={{ color: '#ff8a00', fontSize: '38px' }}>{stats?.projects?.total || 0}</h2>
             </div>
             <div className="bg-warning bg-opacity-10 text-warning p-3 rounded-circle fs-3"><FaListAlt /></div>
           </div>
@@ -116,8 +108,7 @@ const AdminDashboardTab = ({ setActiveTab }) => {
                 <div className="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" style={{ width: '50px', height: '50px', backgroundColor: `${card.color}1a`, color: card.color }}>
                   {card.icon}
                 </div>
-                {/* 👈 تم إضافة ?. هنا لحماية الكود من الانهيار */}
-                <h4 className="fw-bold mb-0" style={{ fontSize: '30px', color: card.color }}>{stats?.usersByType?.[card.key] || 0}</h4>
+                <h4 className="fw-bold mb-0" style={{ fontSize: '30px', color: card.color }}>{stats?.users?.[card.key] || 0}</h4>
                 <span className="text-muted fw-bold" style={{ fontSize: '16px' }}>{card.label}</span>
               </div>
             </div>
@@ -147,7 +138,7 @@ const AdminDashboardTab = ({ setActiveTab }) => {
               </div>
               <div className="d-flex justify-content-between align-items-center p-3 rounded-3" style={{ backgroundColor: 'rgba(239,68,68,0.06)' }}>
                 <span className="fw-bold text-muted"><FaClock className="ms-1 text-danger" /> المشاريع المعلقة</span>
-                <span className="badge bg-danger rounded-pill fw-bold fs-6 px-3">{stats?.projects?.suspended || 0}</span>
+                <span className="badge bg-danger rounded-pill fw-bold fs-6 px-3">{stats?.projects?.paused || 0}</span>
               </div>
             </div>
           </div>

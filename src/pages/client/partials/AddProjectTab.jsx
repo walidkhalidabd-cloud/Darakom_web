@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaStar, FaPlus, FaTrash, FaSpinner, FaCheckCircle } from 'react-icons/fa';
 import { createClientProject } from '../../../services/api/clientApi';
+// تأكد من استيراد apiReq لجلب المحافظات 
+import apiReq from '../../../services/apiReq'; 
 
 const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectProvider, setActiveTab }) => {
     
@@ -8,7 +10,7 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [locationDetails, setLocationDetails] = useState('');
-    const [buildingNo, setBuildingNo] = useState(''); // حقل جديد مطلوب في الـ Controller
+    const [buildingNo, setBuildingNo] = useState('');
     const [provinceId, setProvinceId] = useState('');
     const [area, setArea] = useState('');
     const [tenderDuration, setTenderDuration] = useState('');
@@ -20,6 +22,28 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // حالة جديدة لتخزين المحافظات القادمة من الباك إند
+    const [provinces, setProvinces] = useState([]);
+    const [loadingProvinces, setLoadingProvinces] = useState(true);
+
+    // جلب المحافظات عند تحميل المكون
+    useEffect(() => {
+        const loadProvinces = async () => {
+            try {
+                // نستخدم المسار الموجود في api.php
+                const res = await apiReq.get('/provinces');
+                const data = res.data?.data || res.data || [];
+                setProvinces(data);
+            } catch (err) {
+                console.error("فشل جلب المحافظات:", err);
+                setError("لم نتمكن من تحميل قائمة المحافظات. يرجى تحديث الصفحة.");
+            } finally {
+                setLoadingProvinces(false);
+            }
+        };
+        loadProvinces();
+    }, []);
+
     const addDocumentRow = () => setDocuments([...documents, { id: Date.now(), file: null }]);
     const handleDocChange = (id, file) => setDocuments(documents.map(doc => doc.id === id ? { ...doc, file } : doc));
     const removeDocumentRow = (id) => setDocuments(documents.filter(doc => doc.id !== id));
@@ -29,7 +53,6 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
         setLoading(true);
         setError(null);
 
-        // إنشاء كائن FormData لإرسال البيانات والملفات معاً
         const formData = new FormData();
         formData.append('title', title);
         formData.append('description', description);
@@ -38,24 +61,20 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
         formData.append('province_id', provinceId);
         formData.append('area', area);
         
-        // المتغيرات الثابتة والمشروطة لتطابق Validation اللارافيل
-        formData.append('work_type', projectType); // construction or finishing
-        formData.append('tender_type', tenderType); // normal or urgent
+        formData.append('work_type', projectType); 
+        formData.append('tender_type', tenderType); 
         formData.append('visibility', directProvider ? 'private' : 'public');
         formData.append('invitation_type', directProvider ? 'private' : 'public');
         
         formData.append('tender_duration', tenderDuration);
         formData.append('tender_duration_unit', tenderType === 'urgent' ? 'hour' : 'day');
 
-        // ملاحظة: project_type_id مطلوب في الباك إند دائماً
         formData.append('project_type_id', projectType === 'construction' ? projectTypeId : 1);
         
-        // إذا كان نوع المشروع تشطيب، نرسل نوع الحرفي
         if (projectType === 'finishing' && craftsmanType) {
             formData.append('craftsman_type', craftsmanType);
         }
 
-        // إرفاق الملفات كمصفوفة documents[] للباك إند
         documents.forEach((doc) => {
             if (doc.file) {
                 formData.append('documents[]', doc.file);
@@ -66,12 +85,10 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
             await createClientProject(formData);
             alert(directProvider ? '✅ تم إرسال الطلب المباشر بنجاح!' : '✅ تم طرح المشروع بنجاح!');
             
-            // تصفير الحقول وإعادة التوجيه للوحة التحكم
             setDirectProvider(null);
             setActiveTab('dashboard');
         } catch (err) {
             console.error("Error creating project:", err);
-            // عرض رسالة الخطأ القادمة من الباك إند إن وجدت
             setError(err.response?.data?.message || 'حدث خطأ أثناء إضافة المشروع، يرجى التأكد من صحة البيانات المُدخلة.');
         } finally {
             setLoading(false);
@@ -133,7 +150,6 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
                         <input type="text" className="form-control p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} placeholder="أدخل العنوان بالتفصيل (مثل: الحي، الشارع، أقرب معلم)" value={locationDetails} onChange={(e)=>setLocationDetails(e.target.value)} required />
                     </div>
 
-                    {/* حقل رقم البناء مطلوب في الباك إند */}
                     <div className="col-md-4">
                         <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>رقم البناء / العقار</label>
                         <input type="text" className="form-control p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} placeholder="مثال: 15A" value={buildingNo} onChange={(e)=>setBuildingNo(e.target.value)} required />
@@ -141,23 +157,19 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
 
                     <div className="col-md-6">
                         <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>المحافظة</label>
-                        <select className="form-select p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} value={provinceId} onChange={(e)=>setProvinceId(e.target.value)} required>
-                            <option value="">اختر المحافظة...</option>
-                            {/* استخدمنا الـ IDs بدلاً من الأسماء ليقبلها الـ Backend */}
-                            <option value="1">دمشق</option>
-                            <option value="2">ريف دمشق</option>
-                            <option value="3">حلب</option>
-                            <option value="4">حمص</option>
-                            <option value="5">حماة</option>
-                            <option value="6">اللاذقية</option>
-                            <option value="7">طرطوس</option>
-                            <option value="8">إدلب</option>
-                            <option value="9">الرقة</option>
-                            <option value="10">دير الزور</option>
-                            <option value="11">الحسكة</option>
-                            <option value="12">درعا</option>
-                            <option value="13">السويداء</option>
-                            <option value="14">القنيطرة</option>
+                        <select 
+                            className="form-select p-4 bg-light border" 
+                            style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} 
+                            value={provinceId} 
+                            onChange={(e)=>setProvinceId(e.target.value)} 
+                            disabled={loadingProvinces}
+                            required
+                        >
+                            <option value="">{loadingProvinces ? 'جاري التحميل...' : 'اختر المحافظة...'}</option>
+                            {/* عرض المحافظات بشكل ديناميكي من الباك إند */}
+                            {provinces.map(prov => (
+                                <option key={prov.id} value={prov.id}>{prov.name}</option>
+                            ))}
                         </select>
                     </div>
                     
@@ -231,7 +243,6 @@ const AddProjectTab = ({ projectType, setProjectType, directProvider, setDirectP
                         </>
                     )}
 
-                    {/* المرفقات (تجميع الملفات لإرسالها) */}
                     <div className="col-12 mt-5">
                         <div className="d-flex align-items-center justify-content-between p-4 rounded-4 bg-light border">
                             <span className="fw-bold" style={{ color: '#1b2a47', fontSize: '24px' }}>المرفقات (صور أو ملفات)</span>

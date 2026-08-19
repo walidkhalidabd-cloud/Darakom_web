@@ -2,26 +2,36 @@ import { useState, useEffect } from 'react';
 import { FaMoneyBillWave, FaUserTie, FaRegClock, FaFileContract, FaCheckCircle, FaSpinner, FaTruck, FaStar, FaArrowRight, FaPlus, FaExclamationTriangle, FaCheck, FaHourglassHalf, FaEdit, FaTrash, FaSave, FaTimes, FaMapMarkerAlt, FaBuilding, FaCalendarAlt, FaEye, FaTimesCircle, FaHardHat, FaPaperPlane } from 'react-icons/fa';
 import OfferDetails from './OfferDetails';
 import ProjectRatingForm from '../../../components/ProjectRatingForm';
-import clientApi from '../../../services/api/clientApi'; // تأكد من المسار حسب هيكلية مشروعك
+import clientApi from '../../../services/api/clientApi'; 
+import apiReq from '../../../services/apiReq';
 
 const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
     const [offerStatus, setOfferStatus] = useState('pending');
-    // tracking: 'list' | 'details' | 'complaint' | 'edit' | 'view-offers' | 'offer-detail' | 'rate'
     const [trackingView, setTrackingView] = useState('list');
     const [selectedProject, setSelectedProject] = useState(null);
     const [selectedOffer, setSelectedOffer] = useState(null);
     const [editForm, setEditForm] = useState({
-        title: '', description: '', governorate: '', area: '', providerType: '', tenderDays: ''
+        title: '', description: '', provinceId: '', area: '', providerType: '', tenderDuration: '', tenderDurationUnit: 'day'
     });
     const [editDocs, setEditDocs] = useState([]);
     
-    // States الخاصة بالباك إند
+    // حالة جديدة لتخزين المحافظات القادمة من الباك إند لاستخدامها في التعديل
+    const [provinces, setProvinces] = useState([]);
+
     const [allProjects, setAllProjects] = useState([]);
     const [projectOffers, setProjectOffers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
 
-   
+    // جلب المحافظات (لواجهة التعديل)
+    const loadProvinces = async () => {
+        try {
+            const res = await apiReq.get('/provinces');
+            setProvinces(res.data?.data || res.data || []);
+        } catch (err) {
+            console.error("فشل جلب المحافظات:", err);
+        }
+    };
 
     const fetchProjects = async () => {
         try {
@@ -29,20 +39,25 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
             const response = await clientApi.fetchClientProjects();
             const projectsData = response.data?.data || response.data || [];
             
-            // تهيئة البيانات القادمة من الباك إند لتتطابق مع التصميم
             const formattedProjects = projectsData.map(apiProject => {
-                // تحديد حالة المشروع بناءً على الباك إند
                 let executionStatus = apiProject.execution_status || 'not_started';
                 let progress = 0;
                 if (executionStatus === 'in_progress') progress = 50;
                 if (executionStatus === 'finished') progress = 100;
 
+                // التعامل مع المدة بشكل صحيح
+                let timeRemainingText = 'غير محدد';
+                if (apiProject.tender_duration) {
+                    const unit = apiProject.tender_duration_unit === 'hour' ? 'ساعات' : 'أيام';
+                    timeRemainingText = `${apiProject.tender_duration} ${unit}`;
+                }
+
                 return {
                     id: apiProject.id,
                     projectTitle: apiProject.title || 'مشروع بدون عنوان',
                     providerName: apiProject.performer?.user?.name || null,
-                    providerType: apiProject.projectType?.name || apiProject.providerTypeNeeded || 'غير محدد',
-                    price: apiProject.budget || apiProject.price || '0',
+                    providerType: apiProject.projectType?.name || apiProject.craftsman_type || 'غير محدد',
+                    price: apiProject.budget || apiProject.price || '0', // يبقى للحالات المنتهية فقط
                     duration: apiProject.duration_days ? `${apiProject.duration_days} يوم` : 'غير محدد',
                     datePosted: new Date(apiProject.created_at).toLocaleDateString('ar-EG'),
                     dateAccepted: apiProject.start_date || '',
@@ -51,12 +66,15 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                     progress: progress,
                     status: executionStatus === 'finished' ? 'مكتمل' : (executionStatus === 'in_progress' ? 'قيد التنفيذ' : 'بانتظار العروض'),
                     offersCount: apiProject.offers?.length || 0,
-                    daysRemaining: apiProject.tender_days || 0,
+                    daysRemaining: timeRemainingText, // استخدام النص المنسق
                     governorate: apiProject.province?.name || '',
+                    provinceId: apiProject.province_id || '',
                     area: apiProject.area || '',
                     backendStatus: executionStatus,
                     description: apiProject.description || '',
-                    milestones: apiProject.steps || [] // جلب الخطوات إن وجدت
+                    milestones: apiProject.steps || [],
+                    tenderDurationOriginal: apiProject.tender_duration || '',
+                    tenderDurationUnitOriginal: apiProject.tender_duration_unit || 'day'
                 };
             });
             setAllProjects(formattedProjects);
@@ -66,12 +84,12 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
             setLoading(false);
         }
     };
-    // جلب بيانات المشاريع عند تحميل المكون
+    
     useEffect(() => {
         fetchProjects();
+        loadProvinces();
     }, []);
 
-    // فلترة المشاريع حسب التبويبات الثلاثة
     const pendingOffers = allProjects.filter(p => p.backendStatus === 'not_started');
     const ongoingOffers = allProjects.filter(p => p.backendStatus === 'in_progress');
     const completedOffers = allProjects.filter(p => p.backendStatus === 'finished');
@@ -84,10 +102,11 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         setEditForm({
             title: project.projectTitle,
             description: project.description || project.details,
-            governorate: project.governorate || '',
+            provinceId: project.provinceId || '',
             area: project.area || '',
-            providerType: project.providerTypeNeeded || '',
-            tenderDays: project.tenderDays || ''
+            providerType: project.providerType || '',
+            tenderDuration: project.tenderDurationOriginal,
+            tenderDurationUnit: project.tenderDurationUnitOriginal
         });
         setEditDocs([]);
         setSelectedProject(project);
@@ -108,8 +127,9 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                 title: editForm.title,
                 description: editForm.description,
                 area: editForm.area,
-                tender_days: editForm.tenderDays,
-                // يمكنك إضافة الحقول الإضافية التي يطلبها الـ API هنا مثل المحافظة والنوع
+                province_id: editForm.provinceId,
+                tender_duration: editForm.tenderDuration,
+                tender_duration_unit: editForm.tenderDurationUnit
             };
             
             await clientApi.updateClientProject(selectedProject.id, payload);
@@ -126,7 +146,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
     };
 
     const handleDelete = async (projectId) => {
-        if (window.confirm('هل أنت متأكد من حذف هذا المشروع؟')) {
+        if (window.confirm('هل أنت متأكد من حذف هذا المشروع؟ لن تتمكن من التراجع عن هذا الإجراء.')) {
             try {
                 await clientApi.deleteClientProject(projectId);
                 alert(`تم حذف المشروع بنجاح`);
@@ -155,11 +175,11 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                 id: offer.id,
                 providerName: offer.provider?.user?.name || 'مزود خدمة',
                 providerType: offer.provider?.role?.name || 'مستقل',
-                rating: offer.provider?.rating || 0,
-                price: offer.price,
-                duration: `${offer.duration_days || 0} يوم`,
+                rating: offer.provider?.average_rating || 0, // جلب التقييم الصحيح
+                price: offer.cost || offer.price, // جلب التكلفة من عرض السعر
+                duration: `${offer.duration || offer.duration_days || 0} ${offer.duration_unit === 'day' ? 'يوم' : 'شهر'}`,
                 offerDate: new Date(offer.created_at).toLocaleDateString('ar-EG'),
-                details: offer.details,
+                details: offer.provider_comment || offer.details,
                 status: offer.status || 'pending', 
                 startDate: offer.start_date || '-',
                 stages: offer.stages || []
@@ -318,7 +338,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                                 <FaMoneyBillWave className="text-success" size={18} />
                                                 <span className="text-muted fw-bold small">قيمة العرض</span>
                                             </div>
-                                            <span className="fw-bold fs-4" style={{ color: '#ff8a00' }}>{offer.price} ر.س</span>
+                                            <span className="fw-bold fs-4" style={{ color: '#ff8a00' }}>{offer.price} ل.س</span>
                                         </div>
                                     </div>
                                     <div className="col-md-4">
@@ -334,7 +354,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                         <div className="p-3 rounded-3 bg-white border shadow-sm h-100">
                                             <div className="d-flex align-items-center gap-2 mb-1">
                                                 <FaCalendarAlt className="text-primary" size={18} />
-                                                <span className="text-muted fw-bold small">تاريخ البدء</span>
+                                                <span className="text-muted fw-bold small">تاريخ البدء المتوقع</span>
                                             </div>
                                             <span className="fw-bold fs-4 text-dark">{offer.startDate}</span>
                                         </div>
@@ -346,19 +366,6 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                         {offer.details}
                                     </p>
                                 </div>
-
-                                {offer.stages && offer.stages.length > 0 && (
-                                    <div className="mt-4">
-                                        <h6 className="fw-bold mb-3 text-muted">المراحل الزمنية:</h6>
-                                        <div className="d-flex flex-wrap gap-2">
-                                            {offer.stages.map((stage, idx) => (
-                                                <span key={idx} className="badge bg-light text-dark px-3 py-2 rounded-pill fw-bold border">
-                                                    {stage.name} ({stage.duration})
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
 
                                 <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                                     <span className="text-muted small fw-bold">تاريخ العرض: {offer.offerDate}</span>
@@ -431,8 +438,8 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                 <p className="mb-2"><span className="text-muted fw-bold">مقدم الخدمة:</span> <span className="fw-bold">{selectedProject.providerName}</span></p>
                             )}
                             <p className="mb-2"><span className="text-muted fw-bold">النوع:</span> <span className="badge bg-secondary bg-opacity-10 text-dark px-3 py-1 rounded-pill fw-bold border">{selectedProject.providerType}</span></p>
-                            <p className="mb-2"><span className="text-muted fw-bold">القيمة:</span> <span className="fw-bold" style={{ color: '#ff8a00' }}>{selectedProject.price} ر.س</span></p>
-                            <p className="mb-0"><span className="text-muted fw-bold">المدة:</span> <span className="fw-bold">{selectedProject.duration}</span></p>
+                            <p className="mb-2"><span className="text-muted fw-bold">القيمة المعتمدة:</span> <span className="fw-bold" style={{ color: '#ff8a00' }}>{selectedProject.price} ل.س</span></p>
+                            <p className="mb-0"><span className="text-muted fw-bold">المدة المتوقعة:</span> <span className="fw-bold">{selectedProject.duration}</span></p>
                         </div>
                     </div>
                     <div className="col-md-6">
@@ -605,22 +612,11 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                         </div>
                         <div className="col-md-6">
                             <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>المحافظة</label>
-                            <select className="form-select p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} required value={editForm.governorate} onChange={(e) => setEditForm({...editForm, governorate: e.target.value})}>
+                            <select className="form-select p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} required value={editForm.provinceId} onChange={(e) => setEditForm({...editForm, provinceId: e.target.value})}>
                                 <option value="">اختر المحافظة...</option>
-                                <option value="دمشق">دمشق</option>
-                                <option value="ريف دمشق">ريف دمشق</option>
-                                <option value="حلب">حلب</option>
-                                <option value="حمص">حمص</option>
-                                <option value="حماة">حماة</option>
-                                <option value="اللاذقية">اللاذقية</option>
-                                <option value="طرطوس">طرطوس</option>
-                                <option value="إدلب">إدلب</option>
-                                <option value="الرقة">الرقة</option>
-                                <option value="دير الزور">دير الزور</option>
-                                <option value="الحسكة">الحسكة</option>
-                                <option value="درعا">درعا</option>
-                                <option value="السويداء">السويداء</option>
-                                <option value="القنيطرة">القنيطرة</option>
+                                {provinces.map(prov => (
+                                    <option key={prov.id} value={prov.id}>{prov.name}</option>
+                                ))}
                             </select>
                         </div>
                         <div className="col-md-6">
@@ -631,28 +627,14 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                             </div>
                         </div>
                         <div className="col-md-6">
-                            <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>مزود الخدمة المطلوبة</label>
-                            <select className="form-select p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} required value={editForm.providerType} onChange={(e) => setEditForm({...editForm, providerType: e.target.value})}>
-                                <option value="">اختر...</option>
-                                <option value="مكاتب هندسية وشركات">مكاتب هندسية وشركات</option>
-                                <option value="مهندس مدني">مهندس مدني</option>
-                                <option value="مهندس معماري">مهندس معماري</option>
-                                <option value="مهندس استشاري">مهندس استشاري</option>
-                                <option value="مقاول">مقاول</option>
-                                <option value="فني كهرباء">فني كهرباء</option>
-                                <option value="فني سباكة">فني سباكة</option>
-                                <option value="فني دهان">فني دهان</option>
-                                <option value="فني بلاط">فني بلاط</option>
-                            </select>
-                        </div>
-                        <div className="col-md-6">
-                            <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>مدة المناقصة (بالأيام)</label>
-                            <select className="form-select p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px' }} required value={editForm.tenderDays} onChange={(e) => setEditForm({...editForm, tenderDays: e.target.value})}>
-                                <option value="">اختر...</option>
-                                {Array.from({ length: 30 }, (_, i) => i + 1).map(num => (
-                                    <option key={num} value={num}>{num} يوم</option>
-                                ))}
-                            </select>
+                            <label className="form-label fw-bold mb-3" style={{ fontSize: '22px', color: '#1b2a47' }}>نوع المناقصة (مدة الانتظار)</label>
+                            <div className="input-group">
+                                <input type="number" min="1" className="form-control p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '12px 0 0 12px' }} required value={editForm.tenderDuration} onChange={(e) => setEditForm({...editForm, tenderDuration: e.target.value})} />
+                                <select className="form-select p-4 bg-light border" style={{ borderColor: '#e2e8f0', fontSize: '20px', borderRadius: '0 12px 12px 0', maxWidth: '120px' }} value={editForm.tenderDurationUnit} onChange={(e) => setEditForm({...editForm, tenderDurationUnit: e.target.value})}>
+                                    <option value="day">أيام</option>
+                                    <option value="hour">ساعات</option>
+                                </select>
+                            </div>
                         </div>
                         <div className="col-12 mt-5">
                             <div className="d-flex align-items-center justify-content-between p-4 rounded-4 bg-light border">
@@ -762,7 +744,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                             <div className="d-flex gap-3 mt-3 flex-wrap">
                                                 {project.governorate && <span className="text-muted fw-semibold"><FaMapMarkerAlt className="ms-1 text-primary" />{project.governorate}</span>}
                                                 {project.area && <span className="text-muted fw-semibold"><FaBuilding className="ms-1 text-primary" />{project.area} م²</span>}
-                                                <span className="text-muted fw-semibold"><FaCalendarAlt className="ms-1 text-primary" />متبقي {project.daysRemaining} أيام</span>
+                                                <span className="text-muted fw-semibold"><FaCalendarAlt className="ms-1 text-primary" />متبقي {project.daysRemaining}</span>
                                             </div>
                                         )}
                                         {project.progress > 0 && (
@@ -782,9 +764,8 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                             <>
                                                 <p className="text-muted fw-bold mb-1"><FaRegClock className="me-1" /> تاريخ الطرح</p>
                                                 <h5 className="fw-bold mb-3">{project.datePosted}</h5>
-                                                <p className="text-muted fw-bold mb-1"><FaFileContract className="me-1" /> الميزانية التقديرية</p>
-                                                <h5 className="fw-bold mb-3 text-primary">{project.price}</h5>
-                                                <div className="d-flex flex-column gap-2">
+                                                {/* تم إزالة الميزانية التقديرية من هنا بناءً على طلبك */}
+                                                <div className="d-flex flex-column gap-2 mt-2">
                                                     <button 
                                                         className="btn fw-bold py-2 rounded-pill shadow-sm w-100 d-flex align-items-center justify-content-center gap-2" 
                                                         style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '18px' }}
@@ -813,7 +794,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                                 <p className="text-muted fw-bold mb-1"><FaRegClock className="me-1" /> {project.progress === 100 ? 'المدة المستغرقة' : 'مدة التنفيذ'}</p>
                                                 <h5 className="fw-bold mb-3">{project.duration}</h5>
                                                 <p className="text-muted fw-bold mb-1"><FaMoneyBillWave className="me-1" /> {project.progress === 100 ? 'القيمة النهائية' : 'قيمة العرض المعتمد'}</p>
-                                                <h3 className={`fw-bold mb-4 ${project.progress === 100 ? 'text-secondary' : ''}`} style={{ color: project.progress === 100 ? '#6c757d' : '#ff8a00' }}>{project.price} ر.س</h3>
+                                                <h3 className={`fw-bold mb-4 ${project.progress === 100 ? 'text-secondary' : ''}`} style={{ color: project.progress === 100 ? '#6c757d' : '#ff8a00' }}>{project.price} ل.س</h3>
                                                 {project.progress < 100 ? (
                                                     <button 
                                                         className="btn fw-bold py-2 rounded-pill shadow-sm w-100" 
