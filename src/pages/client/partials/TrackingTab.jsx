@@ -5,15 +5,17 @@ import {
   FaCheckDouble, FaEye, FaExclamationTriangle, FaStar,
   FaPercentage, FaHourglassHalf, FaCheckCircle, FaPaperPlane
 } from 'react-icons/fa';
-import { fetchClientOngoingProjects, fetchClientProjectTracking, submitClientComplaint } from '../../../services/api/clientApi';
+// يجب التأكد من وجود هذه الدوال في ملف clientApi.js الخاص بك
+import { fetchClientOngoingProjects, fetchClientProjectSteps, submitClientComplaint } from '../../../services/api/clientApi';
 import ProjectRatingForm from '../../../components/ProjectRatingForm';
 
 const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
-  const [selectedProjectDetails, setSelectedProjectDetails] = useState(null);
+  const [selectedProjectSteps, setSelectedProjectSteps] = useState([]);
   const [view, setView] = useState('list'); // 'list' | 'details' | 'complaint' | 'rate'
   const [loading, setLoading] = useState(true);
+  const [loadingSteps, setLoadingSteps] = useState(false);
   const [complaintText, setComplaintText] = useState('');
 
   // تحميل المشاريع قيد التنفيذ والمكتملة
@@ -22,30 +24,14 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
       setLoading(true);
       try {
         const res = await fetchClientOngoingProjects();
-        setProjects(res.data?.data || []);
+        // تصفية المشاريع لعرض المشاريع النشطة والمكتملة فقط
+        const allProjects = res.data?.data || res.data || [];
+        const activeProjects = allProjects.filter(p => 
+            p.status === 'active' || p.execution_status === 'in_progress' || p.execution_status === 'finished' || p.status === 'completed'
+        );
+        setProjects(activeProjects);
       } catch (err) {
-        console.warn('⚠️ API غير متاح، استخدام بيانات وهمية:', err.message);
-        // بيانات وهمية مطابقة لهيكل مشاريع المتابعة
-        setProjects([
-          { 
-            id: 1, title: 'بناء عظم - مساحة 400م', provider: 'مؤسسة البناء الذهبي', 
-            providerType: 'مقاول معتمد', location: 'دمشق، المزة', startDate: '2026/05/01',
-            duration: '6 أشهر', price: '150,000', progress: 65, status: 'قيد التنفيذ',
-            stageInfo: 'تم الانتهاء من المرحلة الثانية'
-          },
-          { 
-            id: 2, title: 'تصميم داخلي لفيلا مودرن', provider: 'مكتب الإبداع الهندسي',
-            providerType: 'مكتب هندسي', location: 'اللاذقية، الكورنيش', startDate: '2026/03/01',
-            duration: 'شهرين', price: '45,000', progress: 100, status: 'مكتمل',
-            stageInfo: 'جميع المراحل منجزة ✓'
-          },
-          { 
-            id: 3, title: 'تأسيس شبكة كاميرات مراقبة', provider: 'م. أحمد خالد',
-            providerType: 'مهندس اتصالات', location: 'دمشق، المهاجرين', startDate: '2026/07/01',
-            duration: 'أسبوعين', price: '7,500', progress: 30, status: 'قيد التنفيذ',
-            stageInfo: 'تم تركيب الكاميرات الخارجية'
-          },
-        ]);
+        console.error('Error loading ongoing projects:', err);
       } finally {
         setLoading(false);
       }
@@ -53,47 +39,35 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
     loadProjects();
   }, []);
 
-  // جلب تفاصيل المشروع (المراحل) مع استخدام useCallback لتجنب أخطاء الاعتماديات
+  // جلب تفاصيل خطوات/مراحل المشروع
   const handleViewProject = useCallback(async (project) => {
     setSelectedProject(project);
     setView('details');
+    setLoadingSteps(true);
+    
     try {
-      const res = await fetchClientProjectTracking(project.id);
-      setSelectedProjectDetails(res.data?.data);
-    } catch {
-      // بيانات وهمية للمراحل حسب المشروع
-      const stagesData = {
-        1: [
-          { id: 1, name: 'أعمال الحفر والأساسات', completed: true, date: '2026/05/20', description: 'تم الانتهاء من الحفر وصب الأساسات حسب المخططات الهندسية.' },
-          { id: 2, name: 'أعمال الهيكل الخرساني', completed: true, date: '2026/06/30', description: 'تم صب الأعمدة والأسقف لكامل المساحة.' },
-          { id: 3, name: 'أعمال الطابوق واللياسة', completed: false, progress: 40, description: 'جارٍ العمل على بناء الجدران ولياسة الأسقف...' },
-          { id: 4, name: 'التشطيبات النهائية', completed: false, progress: 0, description: 'لم تبدأ بعد - ستبدأ بعد الانتهاء من اللياسة.' },
-        ],
-        2: [
-          { id: 1, name: 'رفع المساحات والقياسات', completed: true, date: '2026/03/10', description: 'تم رفع جميع القياسات للمساحات الداخلية.' },
-          { id: 2, name: 'التصاميم ثلاثية الأبعاد', completed: true, date: '2026/04/01', description: 'تم تسليم التصاميم ثلاثية الأبعاد واعتمادها.' },
-          { id: 3, name: 'المخططات التنفيذية', completed: true, date: '2026/04/28', description: 'تم تسليم جميع المخططات التنفيذية للكهرباء والسباكة.' },
-          { id: 4, name: 'الإشراف على التنفيذ', completed: true, date: '2026/05/15', description: 'تم الإشراف الكامل والانتهاء من المشروع.' },
-        ],
-        3: [
-          { id: 1, name: 'تركيب الكاميرات الخارجية', completed: true, date: '2026/07/10', description: 'تم تركيب 8 كاميرات خارجية HDCVI.' },
-          { id: 2, name: 'تركيب الكاميرات الداخلية', completed: false, progress: 60, description: 'جارٍ تركيب الكاميرات الداخلية...' },
-          { id: 3, name: 'برمجة النظام والتجربة', completed: false, progress: 0, description: 'لم تبدأ بعد.' },
-        ]
-      };
-      setSelectedProjectDetails({ stages: stagesData[project.id] || stagesData[1] });
+      // استدعاء دالة جلب الخطوات من الباك إند
+      const res = await fetchClientProjectSteps(project.id);
+      const stepsData = res.data?.data || res.data || [];
+      
+      // ترتيب الخطوات حسب المعرف أو تاريخ الإنشاء لضمان تسلسل زمني صحيح
+      const sortedSteps = [...stepsData].sort((a, b) => a.id - b.id);
+      setSelectedProjectSteps(sortedSteps);
+    } catch (err) {
+        console.error("Error fetching project steps:", err);
+        setSelectedProjectSteps([]);
+    } finally {
+        setLoadingSteps(false);
     }
-  }, []); // <-- نهاية useCallback بشكل صحيح
+  }, []);
 
   // فتح تفاصيل المشروع تلقائياً إذا تم التوجيه من واجهة أخرى
   useEffect(() => {
     if (targetProject) {
       handleViewProject(targetProject);
-      // تصفير القيمة حتى لا يفتح المشروع مرة أخرى عند التنقل بين التبويبات
       if (setTargetProject) setTargetProject(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetProject]);
+  }, [targetProject, handleViewProject, setTargetProject]);
 
   // تقديم شكوى
   const handleSubmitComplaint = async (e) => {
@@ -101,18 +75,34 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
     if (!complaintText.trim()) return;
     try {
       await submitClientComplaint({
-        providerName: selectedProject?.provider,
-        projectTitle: selectedProject?.title,
-        description: complaintText
+        project_id: selectedProject?.id,
+        against_user_id: selectedProject?.performer?.user?.id || null,
+        type: 'general',
+        text: complaintText
       });
+      alert(`✅ تم إرسال شكواك بخصوص المشروع "${selectedProject.title}" إلى إدارة المنصة بنجاح.`);
     } catch (err) {
-      console.warn('⚠️ API غير متاح:', err.message);
+      console.error('Error submitting complaint:', err);
+      alert('حدث خطأ أثناء إرسال الشكوى.');
     }
-    alert(`✅ تم إرسال شكواك بخصوص المشروع "${selectedProject.title}" إلى إدارة المنصة. سيتم مراجعتها والرد عليك قريباً.`);
+    
     setView('list');
     setSelectedProject(null);
-    setSelectedProjectDetails(null);
     setComplaintText('');
+  };
+
+  // دالة لحساب نسبة إنجاز المشروع بناءً على الخطوات
+  const calculateProjectProgress = (steps) => {
+      if (!steps || steps.length === 0) return 0;
+      const totalSteps = steps.length;
+      const completedSteps = steps.filter(s => s.status === 'completed' || s.progress_percent === 100).length;
+      
+      // إذا كانت كل الخطوات مكتملة
+      if(totalSteps === completedSteps) return 100;
+
+      // حساب المتوسط العام لنسبة الإنجاز لكل الخطوات
+      const totalProgress = steps.reduce((sum, step) => sum + (step.progress_percent || 0), 0);
+      return Math.round(totalProgress / totalSteps);
   };
 
   if (loading) {
@@ -121,16 +111,8 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
         <div className="d-flex align-items-center gap-3 mb-5 border-bottom pb-3">
           <h3 className="fw-bold text-dark mb-1">متابعة سير المشاريع <FaHardHat className="text-warning ms-2" /></h3>
         </div>
-        <div className="row g-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="col-lg-6 col-xl-4">
-              <div className="card border-0 shadow-sm rounded-4 p-4">
-                <div className="placeholder-glow">
-                  <div className="placeholder col-12" style={{ height: '180px', borderRadius: '12px' }}></div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="text-center py-5">
+            <FaSpinner className="fa-spin fs-1 text-warning" />
         </div>
       </div>
     );
@@ -151,50 +133,35 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
 
           {projects.length > 0 ? (
             <div className="row g-4">
-              {projects.map(project => (
+              {projects.map(project => {
+                  const isCompleted = project.execution_status === 'finished' || project.status === 'completed';
+                  // يمكن استبدال هذه ببيانات حقيقية من الباك إند إن وجدت
+                  const progress = isCompleted ? 100 : (project.progress_percent || 50); 
+                  const providerName = project.performer?.user?.name || project.performer?.user?.full_name || 'مزود الخدمة';
+                  
+                  return (
                 <div key={project.id} className="col-lg-6 col-xl-4">
-                  <div className={`card border-0 shadow-sm rounded-4 p-4 h-100 bg-white border-end border-4 ${project.progress === 100 ? 'border-success' : 'border-warning'}`}>
+                  <div className={`card border-0 shadow-sm rounded-4 p-4 h-100 bg-white border-end border-4 ${isCompleted ? 'border-success' : 'border-warning'}`}>
                     
                     {/* رأس البطاقة */}
                     <div className="d-flex justify-content-between align-items-start mb-3">
                       <div className="d-flex align-items-center gap-2">
                         <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                          <FaHardHat className={project.progress === 100 ? 'text-success fs-4' : 'text-warning fs-4'} />
+                          <FaHardHat className={isCompleted ? 'text-success fs-4' : 'text-warning fs-4'} />
                         </div>
                         <div>
                           <h5 className="fw-bold mb-0" style={{ color: '#1b2a47', fontSize: '17px' }}>{project.title}</h5>
-                          <small className="text-muted fw-semibold">{project.provider}</small>
+                          <small className="text-muted fw-semibold">{providerName}</small>
                         </div>
                       </div>
-                      <span className={`badge ${project.progress === 100 ? 'bg-success' : 'bg-warning text-dark'} rounded-pill px-3 py-2 fw-bold fs-6`} style={{ whiteSpace: 'nowrap' }}>
-                        {project.progress === 100 ? <><FaCheck className="me-1" /> مكتمل</> : <><FaSpinner className="fa-spin me-1" /> {project.progress}%</>}
+                      <span className={`badge ${isCompleted ? 'bg-success' : 'bg-warning text-dark'} rounded-pill px-3 py-2 fw-bold fs-6`} style={{ whiteSpace: 'nowrap' }}>
+                        {isCompleted ? <><FaCheck className="me-1" /> مكتمل</> : <><FaSpinner className="fa-spin me-1" /> قيد التنفيذ</>}
                       </span>
                     </div>
 
-                    {/* شريط التقدم */}
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between text-muted small fw-bold mb-1">
-                        <span>نسبة الإنجاز</span>
-                        <span className={project.progress === 100 ? 'text-success' : 'text-warning'}>{project.progress}%</span>
-                      </div>
-                      <div className="progress" style={{ height: '10px', borderRadius: '10px' }}>
-                        <div 
-                          className={`progress-bar ${project.progress === 100 ? 'bg-success' : 'bg-warning progress-bar-striped progress-bar-animated'}`} 
-                          style={{ width: `${project.progress}%`, borderRadius: '10px' }}
-                        ></div>
-                      </div>
-                    </div>
-
                     {/* معلومات سريعة */}
-                    <div className="d-flex flex-wrap gap-2 text-muted fw-semibold small mb-3">
-                      <span><FaMapMarkerAlt className="text-warning ms-1" /> {project.location}</span>
-                      <span><FaCalendarAlt className="text-primary ms-1" /> {project.startDate}</span>
-                    </div>
-
-                    {/* آخر تحديث */}
-                    <div className="bg-light p-3 rounded-3 mb-3">
-                      <small className="text-muted fw-bold d-block mb-1">آخر تحديث:</small>
-                      <span className="fw-semibold" style={{ fontSize: '15px', color: '#1b2a47' }}>{project.stageInfo}</span>
+                    <div className="d-flex flex-wrap gap-2 text-muted fw-semibold small mb-4 mt-2">
+                      <span><FaMapMarkerAlt className="text-warning ms-1" /> {project.location_details || project.province?.name || 'موقع المشروع'}</span>
                     </div>
 
                     {/* زر عرض التفاصيل */}
@@ -203,17 +170,17 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
                       style={{ backgroundColor: '#1b2a47', fontSize: '16px' }}
                       onClick={() => handleViewProject(project)}
                     >
-                      <FaEye /> {project.progress === 100 ? 'عرض التفاصيل والتقييم' : 'عرض وتتبع الإنجاز'}
+                      <FaEye /> {isCompleted ? 'عرض التفاصيل والتقييم' : 'عرض وتتبع الإنجاز'}
                     </button>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           ) : (
             <div className="text-center py-5">
               <FaHardHat className="text-muted mb-3 opacity-25" size={60} />
               <h4 className="text-muted fw-bold">لا توجد مشاريع قيد التنفيذ حالياً</h4>
-              <p className="text-muted fw-semibold">عند الموافقة على عرض لمشروعك سيظهر هنا لتتمكن من متابعة سير العمل.</p>
+              <p className="text-muted fw-semibold">عند الموافقة على عرض لمشروعك وبدء تنفيذه، سيظهر هنا.</p>
               <button 
                 className="btn fw-bold px-5 py-3 rounded-pill shadow-sm mt-3"
                 style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '18px' }}
@@ -232,180 +199,190 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
           {/* زر العودة */}
           <button 
             className="btn btn-light fw-bold mb-4 w-auto me-auto d-flex align-items-center gap-2 rounded-pill px-4 py-2 shadow-sm" 
-            onClick={() => { setView('list'); setSelectedProjectDetails(null); }}
+            onClick={() => { setView('list'); setSelectedProjectSteps([]); }}
           >
             <FaArrowRight /> العودة للقائمة
           </button>
 
-          {/* رأس التفاصيل */}
-          <div className="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3 border-bottom pb-4">
-            <div>
-              <h2 className="fw-bold mb-2" style={{ color: '#1b2a47' }}>{selectedProject.title}</h2>
-              <div className="d-flex flex-wrap gap-3 text-muted fw-semibold">
-                <span><FaUserTie className="text-warning ms-1" /> {selectedProject.provider}</span>
-                <span className="badge bg-secondary bg-opacity-10 text-dark px-3 py-1 rounded-pill border">{selectedProject.providerType}</span>
-                <span><FaMapMarkerAlt className="text-danger ms-1" /> {selectedProject.location}</span>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="fw-bold fs-2" style={{ color: selectedProject.progress === 100 ? '#10b981' : '#ff8a00' }}>
-                <FaPercentage className="ms-1" /> {selectedProject.progress}%
-              </div>
-              <span className={`badge ${selectedProject.progress === 100 ? 'bg-success' : 'bg-warning text-dark'} px-3 py-2 rounded-pill fw-bold fs-6 mt-1`}>
-                {selectedProject.status}
-              </span>
-            </div>
-          </div>
+          {/* حساب المتغيرات */}
+          {(() => {
+              const isCompleted = selectedProject.execution_status === 'finished' || selectedProject.status === 'completed';
+              const providerName = selectedProject.performer?.user?.name || selectedProject.performer?.user?.full_name || 'مزود الخدمة';
+              const providerType = selectedProject.performer?.role?.name || 'مزود خدمة';
+              const calculatedProgress = calculateProjectProgress(selectedProjectSteps);
+              const finalProgress = isCompleted ? 100 : calculatedProgress;
 
-          {/* معلومات المشروع الأساسية */}
-          <div className="row g-3 mb-5 bg-light p-3 rounded-4 border">
-            <div className="col-md-4 text-center border-md-start">
-              <small className="text-muted fw-bold d-block">تاريخ البداية</small>
-              <strong className="fs-5" style={{ color: '#1b2a47' }}>{selectedProject.startDate}</strong>
-            </div>
-            <div className="col-md-4 text-center border-md-start">
-              <small className="text-muted fw-bold d-block">المدة</small>
-              <strong className="fs-5" style={{ color: '#1b2a47' }}>{selectedProject.duration}</strong>
-            </div>
-            <div className="col-md-4 text-center">
-              <small className="text-muted fw-bold d-block">قيمة العقد</small>
-              <strong className="fs-5" style={{ color: '#ff8a00' }}>{selectedProject.price} ل.س</strong>
-            </div>
-          </div>
-
-          {/* شريط التقدم الكلي */}
-          <div className="mb-5">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h5 className="fw-bold mb-0" style={{ color: '#1b2a47' }}>
-                <FaProjectDiagram className="ms-2 text-warning" /> مراحل المشروع
-              </h5>
-              <span className="fw-bold" style={{ color: selectedProject.progress === 100 ? '#10b981' : '#ff8a00', fontSize: '20px' }}>
-                {selectedProject.progress}% مكتمل
-              </span>
-            </div>
-            <div className="progress mb-4" style={{ height: '14px', borderRadius: '10px' }}>
-              <div 
-                className={`progress-bar ${selectedProject.progress === 100 ? 'bg-success' : 'bg-warning progress-bar-striped progress-bar-animated'}`} 
-                style={{ width: `${selectedProject.progress}%`, borderRadius: '10px' }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Timeline للمراحل */}
-          <div className="position-relative me-3" style={{ paddingRight: '30px' }}>
-            {(selectedProjectDetails?.stages || []).length > 0 ? (
-              (selectedProjectDetails?.stages || []).map((stage, index) => (
-                <div key={stage.id} className="mb-5 position-relative px-4">
-                  {/* الدائرة الزمنية */}
-                  <div 
-                    className="position-absolute d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-sm"
-                    style={{ 
-                      width: '44px', height: '44px', 
-                      right: '-37px', top: '0', 
-                      backgroundColor: stage.completed ? '#10b981' : (stage.progress || 0) > 0 ? '#ff8a00' : '#cbd5e1',
-                      fontSize: '16px',
-                      zIndex: 2
-                    }}
-                  >
-                    {stage.completed ? <FaCheck /> : (stage.progress || 0) > 0 ? <FaSpinner className="fa-spin" /> : index + 1}
-                  </div>
-                  
-                  {/* الخط الرابط */}
-                  {index < (selectedProjectDetails?.stages || []).length - 1 && (
-                    <div 
-                      className="position-absolute"
-                      style={{ 
-                        width: '3px', 
-                        right: '-15px', 
-                        top: '44px', 
-                        bottom: '-20px',
-                        backgroundColor: stage.completed ? '#10b981' : '#e2e8f0',
-                        zIndex: 1
-                      }}
-                    ></div>
-                  )}
-
-                  {/* بطاقة المرحلة */}
-                  <div className={`rounded-4 p-4 border ${stage.completed ? 'bg-light border-success border-opacity-25' : (stage.progress || 0) > 0 ? 'bg-white shadow-sm border-end border-4 border-warning' : 'bg-light opacity-75'}`}>
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="flex-grow-1">
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <h5 className={`fw-bold mb-0 ${stage.completed ? 'text-success' : ''}`} style={{ fontSize: '18px' }}>
-                            {stage.name}
-                          </h5>
-                          {stage.completed && <FaCheckCircle className="text-success fs-5" />}
-                        </div>
-                        <p className="text-muted fw-semibold mb-0" style={{ fontSize: '16px', lineHeight: '1.8' }}>
-                          {stage.description}
-                        </p>
-                      </div>
-                      <div className="me-3 flex-shrink-0">
-                        {stage.completed && stage.date && (
-                          <span className="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-bold fs-6" style={{ whiteSpace: 'nowrap' }}>
-                            <FaCheckDouble className="ms-1" /> {stage.date}
-                          </span>
-                        )}
-                        {!stage.completed && (stage.progress || 0) > 0 && (
-                          <span className="badge bg-warning bg-opacity-10 text-warning px-3 py-2 rounded-pill fw-bold fs-6" style={{ whiteSpace: 'nowrap' }}>
-                            <FaSpinner className="fa-spin ms-1" /> {stage.progress}%
-                          </span>
-                        )}
-                        {!stage.completed && !stage.progress && (
-                          <span className="badge bg-secondary bg-opacity-10 text-secondary px-3 py-2 rounded-pill fw-bold fs-6" style={{ whiteSpace: 'nowrap' }}>
-                            <FaHourglassHalf className="ms-1" /> قيد الانتظار
-                          </span>
-                        )}
+              return (
+              <>
+                  {/* رأس التفاصيل */}
+                  <div className="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3 border-bottom pb-4">
+                    <div>
+                      <h2 className="fw-bold mb-2" style={{ color: '#1b2a47' }}>{selectedProject.title}</h2>
+                      <div className="d-flex flex-wrap gap-3 text-muted fw-semibold">
+                        <span><FaUserTie className="text-warning ms-1" /> {providerName}</span>
+                        <span className="badge bg-secondary bg-opacity-10 text-dark px-3 py-1 rounded-pill border">{providerType}</span>
+                        <span><FaMapMarkerAlt className="text-danger ms-1" /> {selectedProject.location_details || 'موقع غير محدد'}</span>
                       </div>
                     </div>
+                    <div className="text-center">
+                      <div className="fw-bold fs-2" style={{ color: finalProgress === 100 ? '#10b981' : '#ff8a00' }}>
+                        <FaPercentage className="ms-1" /> {finalProgress}%
+                      </div>
+                      <span className={`badge ${finalProgress === 100 ? 'bg-success' : 'bg-warning text-dark'} px-3 py-2 rounded-pill fw-bold fs-6 mt-1`}>
+                        {isCompleted ? 'مكتمل' : 'قيد التنفيذ'}
+                      </span>
+                    </div>
+                  </div>
 
-                    {/* شريط تقدم للمراحل غير المكتملة والتي قيد العمل */}
-                    {!stage.completed && (stage.progress || 0) > 0 && (
-                      <div className="mt-3">
-                        <div className="progress" style={{ height: '8px', borderRadius: '10px' }}>
-                          <div className="progress-bar bg-warning" style={{ width: `${stage.progress}%`, borderRadius: '10px' }}></div>
+                  {/* معلومات المشروع الأساسية */}
+                  <div className="row g-3 mb-5 bg-light p-3 rounded-4 border">
+                    <div className="col-md-6 text-center border-md-start">
+                      <small className="text-muted fw-bold d-block">تاريخ البداية المتوقع</small>
+                      <strong className="fs-5" style={{ color: '#1b2a47' }}>{selectedProject.start_date || 'غير محدد'}</strong>
+                    </div>
+                    <div className="col-md-6 text-center">
+                      <small className="text-muted fw-bold d-block">قيمة الميزانية التقديرية</small>
+                      <strong className="fs-5" style={{ color: '#ff8a00' }}>{selectedProject.budget || 'غير محدد'} ل.س</strong>
+                    </div>
+                  </div>
+
+                  {/* شريط التقدم الكلي */}
+                  <div className="mb-5">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h5 className="fw-bold mb-0" style={{ color: '#1b2a47' }}>
+                        <FaProjectDiagram className="ms-2 text-warning" /> مراحل المشروع
+                      </h5>
+                    </div>
+                    <div className="progress mb-4" style={{ height: '14px', borderRadius: '10px' }}>
+                      <div 
+                        className={`progress-bar ${finalProgress === 100 ? 'bg-success' : 'bg-warning progress-bar-striped progress-bar-animated'}`} 
+                        style={{ width: `${finalProgress}%`, borderRadius: '10px' }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Timeline للمراحل */}
+                  <div className="position-relative me-3" style={{ paddingRight: '30px' }}>
+                    {loadingSteps ? (
+                         <div className="text-center py-4"><FaSpinner className="fa-spin fs-2 text-warning" /></div>
+                    ) : selectedProjectSteps.length > 0 ? (
+                      selectedProjectSteps.map((stage, index) => {
+                          const isStageCompleted = stage.status === 'completed' || stage.progress_percent === 100;
+                          const stageProgress = stage.progress_percent || 0;
+                          
+                          return (
+                        <div key={stage.id} className="mb-5 position-relative px-4">
+                          {/* الدائرة الزمنية */}
+                          <div 
+                            className="position-absolute d-flex align-items-center justify-content-center rounded-circle text-white fw-bold shadow-sm"
+                            style={{ 
+                              width: '44px', height: '44px', 
+                              right: '-37px', top: '0', 
+                              backgroundColor: isStageCompleted ? '#10b981' : stageProgress > 0 ? '#ff8a00' : '#cbd5e1',
+                              fontSize: '16px',
+                              zIndex: 2
+                            }}
+                          >
+                            {isStageCompleted ? <FaCheck /> : stageProgress > 0 ? <FaSpinner className="fa-spin" /> : index + 1}
+                          </div>
+                          
+                          {/* الخط الرابط */}
+                          {index < selectedProjectSteps.length - 1 && (
+                            <div 
+                              className="position-absolute"
+                              style={{ 
+                                width: '3px', 
+                                right: '-15px', 
+                                top: '44px', 
+                                bottom: '-20px',
+                                backgroundColor: isStageCompleted ? '#10b981' : '#e2e8f0',
+                                zIndex: 1
+                              }}
+                            ></div>
+                          )}
+
+                          {/* بطاقة المرحلة */}
+                          <div className={`rounded-4 p-4 border ${isStageCompleted ? 'bg-light border-success border-opacity-25' : stageProgress > 0 ? 'bg-white shadow-sm border-end border-4 border-warning' : 'bg-light opacity-75'}`}>
+                            <div className="d-flex justify-content-between align-items-start">
+                              <div className="flex-grow-1">
+                                <div className="d-flex align-items-center gap-2 mb-2">
+                                  <h5 className={`fw-bold mb-0 ${isStageCompleted ? 'text-success' : ''}`} style={{ fontSize: '18px' }}>
+                                    {stage.title}
+                                  </h5>
+                                  {isStageCompleted && <FaCheckCircle className="text-success fs-5" />}
+                                </div>
+                                <p className="text-muted fw-semibold mb-0" style={{ fontSize: '16px', lineHeight: '1.8' }}>
+                                  {stage.description || 'لا يوجد وصف مضاف لهذه المرحلة.'}
+                                </p>
+                              </div>
+                              <div className="me-3 flex-shrink-0 text-start">
+                                {isStageCompleted ? (
+                                  <span className="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-bold fs-6" style={{ whiteSpace: 'nowrap' }}>
+                                    <FaCheckDouble className="ms-1" /> {stage.date || 'مكتملة'}
+                                  </span>
+                                ) : stageProgress > 0 ? (
+                                  <span className="badge bg-warning bg-opacity-10 text-warning px-3 py-2 rounded-pill fw-bold fs-6" style={{ whiteSpace: 'nowrap' }}>
+                                    <FaSpinner className="fa-spin ms-1" /> {stageProgress}%
+                                  </span>
+                                ) : (
+                                  <span className="badge bg-secondary bg-opacity-10 text-secondary px-3 py-2 rounded-pill fw-bold fs-6" style={{ whiteSpace: 'nowrap' }}>
+                                    <FaHourglassHalf className="ms-1" /> قيد الانتظار
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* شريط تقدم للمراحل غير المكتملة والتي قيد العمل */}
+                            {!isStageCompleted && stageProgress > 0 && (
+                              <div className="mt-3">
+                                <div className="progress" style={{ height: '8px', borderRadius: '10px' }}>
+                                  <div className="progress-bar bg-warning" style={{ width: `${stageProgress}%`, borderRadius: '10px' }}></div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                      )})
+                    ) : (
+                      <div className="text-center py-5">
+                        <FaProjectDiagram className="text-muted mb-3 opacity-25" size={50} />
+                        <h4 className="text-muted fw-bold">لم يتم إضافة مراحل بعد</h4>
+                        <p className="text-muted fw-semibold">مزود الخدمة سيضيف مراحل المشروع تباعاً عند بدء العمل.</p>
                       </div>
                     )}
                   </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-5">
-                <FaProjectDiagram className="text-muted mb-3 opacity-25" size={50} />
-                <h4 className="text-muted fw-bold">لم يتم إضافة مراحل بعد</h4>
-                <p className="text-muted fw-semibold">مزود الخدمة سيضيف مراحل المشروع تباعاً عند بدء العمل.</p>
-              </div>
-            )}
-          </div>
 
-          {/* أزرار الإجراءات */}
-          <div className="d-flex justify-content-center gap-3 mt-5 pt-4 border-top flex-wrap">
-            {selectedProject.progress === 100 && (
-              <button 
-                className="btn fw-bold px-5 py-3 rounded-pill shadow-sm text-white d-flex align-items-center gap-2"
-                style={{ backgroundColor: '#ff8a00', fontSize: '18px' }}
-                onClick={() => setView('rate')}
-              >
-                <FaStar /> تقييم المشروع
-              </button>
-            )}
-            {selectedProject.progress < 100 && selectedProject.progress > 0 && (
-              <button 
-                className="btn fw-bold px-5 py-3 rounded-pill shadow-sm btn-danger d-flex align-items-center gap-2"
-                style={{ fontSize: '18px' }}
-                onClick={() => setView('complaint')}
-              >
-                <FaExclamationTriangle /> تقديم شكوى
-              </button>
-            )}
-            <button 
-              className="btn fw-bold px-5 py-3 rounded-pill shadow-sm"
-              style={{ backgroundColor: '#e2e8f0', color: '#1b2a47', fontSize: '18px' }}
-              onClick={() => { setView('list'); setSelectedProjectDetails(null); }}
-            >
-              <FaArrowRight /> العودة
-            </button>
-          </div>
+                  {/* أزرار الإجراءات */}
+                  <div className="d-flex justify-content-center gap-3 mt-5 pt-4 border-top flex-wrap">
+                    {isCompleted && (
+                      <button 
+                        className="btn fw-bold px-5 py-3 rounded-pill shadow-sm text-white d-flex align-items-center gap-2"
+                        style={{ backgroundColor: '#ff8a00', fontSize: '18px' }}
+                        onClick={() => setView('rate')}
+                      >
+                        <FaStar /> تقييم المشروع
+                      </button>
+                    )}
+                    {!isCompleted && (
+                      <button 
+                        className="btn fw-bold px-5 py-3 rounded-pill shadow-sm btn-danger d-flex align-items-center gap-2"
+                        style={{ fontSize: '18px' }}
+                        onClick={() => setView('complaint')}
+                      >
+                        <FaExclamationTriangle /> تقديم شكوى
+                      </button>
+                    )}
+                    <button 
+                      className="btn fw-bold px-5 py-3 rounded-pill shadow-sm"
+                      style={{ backgroundColor: '#e2e8f0', color: '#1b2a47', fontSize: '18px' }}
+                      onClick={() => { setView('list'); setSelectedProjectSteps([]); }}
+                    >
+                      <FaArrowRight /> العودة
+                    </button>
+                  </div>
+              </>
+              );
+          })()}
         </div>
       )}
 
@@ -413,7 +390,7 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
       {view === 'rate' && selectedProject && (
         <ProjectRatingForm
           project={selectedProject}
-          onBack={() => { setView('details'); setSelectedProjectDetails(null); }}
+          onBack={() => { setView('details'); }}
         />
       )}
 
@@ -440,13 +417,13 @@ const TrackingTab = ({ setActiveTab, targetProject, setTargetProject }) => {
               <div className="col-md-6">
                 <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>اسم مزود الخدمة</label>
                 <div className="form-control p-3 bg-light text-muted fw-bold border" style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}>
-                  {selectedProject.provider || selectedProject.providerName}
+                  {selectedProject.performer?.user?.name || selectedProject.performer?.user?.full_name || 'مزود الخدمة'}
                 </div>
               </div>
               <div className="col-md-6">
                 <label className="form-label fw-bold fs-5 mb-2" style={{ color: '#1b2a47' }}>المشروع المرتبط</label>
                 <div className="form-control p-3 bg-light text-muted fw-bold border" style={{ borderColor: '#e2e8f0', fontSize: '17px', borderRadius: '12px' }}>
-                  {selectedProject.title || selectedProject.projectTitle}
+                  {selectedProject.title}
                 </div>
               </div>
             </div>

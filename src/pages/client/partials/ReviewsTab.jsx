@@ -1,116 +1,100 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaStar, FaUserTie, FaHardHat, FaQuoteRight, FaCommentDots, FaPlus, FaArrowRight, FaCheckCircle, FaSpinner } from 'react-icons/fa';
+import { fetchClientMyRatings, fetchClientProjects, rateProject } from '../../../services/api/clientApi';
 
 const ReviewsTab = () => {
-    // view: 'list' | 'new'
     const [view, setView] = useState('list');
+    const [givenReviews, setGivenReviews] = useState([]);
+    
+    // مشاريع العميل المتاحة للتقييم (التي اكتمل تنفيذها)
+    const [availableProjects, setAvailableProjects] = useState([]);
 
-    // بيانات وهمية: مزودو الخدمة الذين تعامل معهم العميل (مع المشاريع المرتبطة)
-    const providers = [
-        {
-            id: 1,
-            name: 'مؤسسة البناء الذهبي',
-            type: 'مقاول بناء',
-            projects: [
-                { id: 101, title: 'بناء عظم - مساحة 400م' },
-                { id: 102, title: 'تأسيس شبكة كاميرات مراقبة' }
-            ]
-        },
-        {
-            id: 2,
-            name: 'مكتب الإبداع الهندسي',
-            type: 'مكتب هندسي',
-            projects: [
-                { id: 201, title: 'تصميم داخلي لفيلا' },
-                { id: 202, title: 'تصميم داخلي لمكتب' }
-            ]
-        },
-        {
-            id: 3,
-            name: 'م. أحمد خالد',
-            type: 'مهندس اتصالات',
-            projects: [
-                { id: 301, title: 'تأسيس شبكة كاميرات مراقبة' }
-            ]
-        }
-    ];
-
-    // بيانات وهمية: تقييمات قدمها العميل لمزودي الخدمة
-    const [givenReviews, setGivenReviews] = useState([
-        {
-            id: 1,
-            providerName: 'مؤسسة البناء الذهبي',
-            projectTitle: 'بناء عظم - مساحة 400م',
-            rating: 5,
-            reviewText: 'عمل ممتاز جداً واحترافية عالية في التنفيذ. تم تسليم المشروع قبل الموعد المحدد بأسبوعين، والمهندس المشرف كان متعاوناً جداً في تعديل بعض التفاصيل.',
-            date: '2026/05/15'
-        },
-        {
-            id: 2,
-            providerName: 'مكتب الإبداع الهندسي',
-            projectTitle: 'تصميم داخلي لفيلا',
-            rating: 4,
-            reviewText: 'التصاميم جميلة جداً ومبتكرة وتلبي الطموحات، ولكن كان هناك تأخير بسيط في تسليم المخططات النهائية لمدة يومين. بشكل عام تجربة جيدة جداً.',
-            date: '2026/02/20'
-        }
-    ]);
-
-    // حالة نموذج التقييم الجديد
-    const [selectedProviderId, setSelectedProviderId] = useState('');
+    const [loading, setLoading] = useState(true);
     const [selectedProjectId, setSelectedProjectId] = useState('');
     const [rating, setRating] = useState(0);
     const [hoverRating, setHoverRating] = useState(0);
     const [reviewText, setReviewText] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [error, setError] = useState(null);
 
-    // المزود المختار
-    const selectedProvider = providers.find(p => p.id === Number(selectedProviderId));
-    const selectedProject = selectedProvider?.projects.find(p => p.id === Number(selectedProjectId));
+    // جلب التقييمات السابقة والمشاريع المكتملة
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                // 1. جلب التقييمات التي قدمها العميل
+                const ratingsRes = await fetchClientMyRatings();
+                const ratingsData = ratingsRes.data?.data || ratingsRes.data || [];
+                if (Array.isArray(ratingsData)) {
+                    setGivenReviews(ratingsData);
+                }
 
-    // عند اختيار مزود الخدمة: استعادة المشاريع المرتبطة به
-    const handleProviderChange = (e) => {
-        const pid = e.target.value;
-        setSelectedProviderId(pid);
-        setSelectedProjectId(''); // إعادة تعيين المشروع حتى يختار/يضاف تلقائياً
-    };
+                // 2. جلب المشاريع لمعرفة ما يمكن تقييمه
+                // (نجلب كل المشاريع ثم نفلتر المنتهي منها والذي يملك مزود خدمة)
+                const projectsRes = await fetchClientProjects();
+                const projectsData = projectsRes.data?.data || projectsRes.data || [];
+                if (Array.isArray(projectsData)) {
+                    const finishedProjects = projectsData.filter(
+                        p => p.execution_status === 'finished' && p.performed_by
+                    );
+                    setAvailableProjects(finishedProjects);
+                }
+            } catch (err) {
+                console.error("Error loading reviews or projects", err);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    // اختيار المزود تلقائياً يضيف المشروع إذا كان لديه مشروع واحد فقط
-    const handleProjectAutoSelect = (pid) => {
-        const provider = providers.find(p => p.id === Number(pid));
-        if (provider && provider.projects.length === 1) {
-            setSelectedProjectId(provider.projects[0].id);
+        if (view === 'list') {
+            loadData();
+        } else if (view === 'new' && availableProjects.length === 0) {
+            // جلب المشاريع فقط إذا لم تكن موجودة وفتحنا واجهة الجديد
+            loadData();
         }
-    };
+    }, [view]);
 
-    // إرسال التقييم الجديد
-    const handleSubmit = (e) => {
+    // المشروع المختار للتقييم
+    const selectedProject = availableProjects.find(p => p.id === Number(selectedProjectId));
+
+    // إرسال التقييم الجديد للباك إند
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!selectedProvider || !selectedProject || rating === 0) return;
+        if (!selectedProject || rating === 0) return;
         setSubmitting(true);
-        setTimeout(() => {
-            const newReview = {
-                id: Date.now(),
-                providerName: selectedProvider.name,
-                projectTitle: selectedProject.title,
-                rating,
-                reviewText,
-                date: new Date().toLocaleDateString('sv-SE')
-            };
-            setGivenReviews([newReview, ...givenReviews]);
+        setError(null);
+        
+        try {
+            await rateProject(selectedProject.id, {
+                rate: rating,
+                comment: reviewText
+            });
+            
             setSubmitting(false);
             setSubmitted(true);
-        }, 600);
+            
+            // تحديث قائمة التقييمات بعد الإرسال الناجح
+            const ratingsRes = await fetchClientMyRatings();
+            const ratingsData = ratingsRes.data?.data || ratingsRes.data || [];
+            if (Array.isArray(ratingsData)) {
+                 setGivenReviews(ratingsData);
+            }
+        } catch (err) {
+            console.error("Error submitting review", err);
+            setError(err.response?.data?.message || 'حدث خطأ أثناء إرسال التقييم.');
+            setSubmitting(false);
+        }
     };
 
     // إعادة تعيين النموذج بعد الإرسال
     const resetForm = () => {
         setView('list');
-        setSelectedProviderId('');
         setSelectedProjectId('');
         setRating(0);
         setReviewText('');
         setSubmitted(false);
+        setError(null);
     };
 
     // دالة لطباعة النجوم برمجياً بناءً على التقييم
@@ -138,7 +122,7 @@ const ReviewsTab = () => {
                         </div>
                         <h2 className="fw-bold mb-3" style={{ color: '#10b981' }}>شكراً لك! ✅</h2>
                         <p className="text-muted fw-semibold fs-5 mb-4" style={{ lineHeight: '1.8' }}>
-                            تم إرسال تقييمك لمزود الخدمة <strong style={{ color: '#1b2a47' }}>{selectedProvider?.name}</strong> على مشروع
+                            تم إرسال تقييمك لمزود الخدمة <strong style={{ color: '#1b2a47' }}>{selectedProject?.performer?.user?.name || 'المزود'}</strong> على مشروع
                             <strong style={{ color: '#1b2a47' }}> {selectedProject?.title}</strong> بنجاح.
                         </p>
                         <div className="d-flex justify-content-center gap-1 mb-4">
@@ -161,70 +145,42 @@ const ReviewsTab = () => {
                                 <FaStar size={40} />
                             </div>
                             <h3 className="fw-bold" style={{ color: '#1b2a47' }}>إضافة تقييم جديد</h3>
-                            <p className="text-muted fw-semibold fs-5">اختر مزود الخدمة وسيتم إضافة المشروع المرتبط به تلقائياً</p>
+                            <p className="text-muted fw-semibold fs-5">اختر المشروع المكتمل الذي ترغب بتقييم مزود الخدمة الخاص به</p>
                         </div>
 
+                        {error && (
+                            <div className="alert alert-danger fw-bold rounded-3 shadow-sm mb-4">
+                                ⚠️ {error}
+                            </div>
+                        )}
+
                         <form onSubmit={handleSubmit}>
-                            {/* اختيار مزود الخدمة */}
+                            {/* اختيار المشروع المنتهي */}
                             <div className="mb-4">
                                 <label className="form-label fw-bold fs-5 mb-3" style={{ color: '#1b2a47' }}>
-                                    <FaUserTie className="ms-2 text-warning" /> اختر مزود الخدمة
+                                    <FaHardHat className="ms-2 text-warning" /> اختر المشروع
                                 </label>
-                                <select
-                                    className="form-select p-4 bg-light border"
-                                    style={{ borderColor: '#e2e8f0', fontSize: '18px', borderRadius: '12px' }}
-                                    value={selectedProviderId}
-                                    onChange={(e) => { handleProviderChange(e); handleProjectAutoSelect(e.target.value); }}
-                                    required
-                                >
-                                    <option value="">-- اختر مزود الخدمة --</option>
-                                    {providers.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
-                                    ))}
-                                </select>
+                                {availableProjects.length === 0 ? (
+                                    <div className="alert alert-warning fw-bold">
+                                        لا يوجد لديك مشاريع مكتملة للتقييم حالياً.
+                                    </div>
+                                ) : (
+                                    <select
+                                        className="form-select p-4 bg-light border"
+                                        style={{ borderColor: '#e2e8f0', fontSize: '18px', borderRadius: '12px' }}
+                                        value={selectedProjectId}
+                                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                                        required
+                                    >
+                                        <option value="">-- اختر المشروع المكتمل --</option>
+                                        {availableProjects.map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.title} (المزود: {p.performer?.user?.name || 'غير متوفر'})
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
-
-                            {/* المشروع المرتبط - يظهر بعد اختيار المزود */}
-                            {selectedProvider && (
-                                <div className="mb-4">
-                                    <label className="form-label fw-bold fs-5 mb-3" style={{ color: '#1b2a47' }}>
-                                        <FaHardHat className="ms-2 text-warning" /> المشروع المرتبط
-                                    </label>
-                                    {selectedProvider.projects.length === 1 ? (
-                                        <div className="p-4 bg-light border rounded-4 d-flex align-items-center gap-3">
-                                            <FaCheckCircle className="text-success" size={24} />
-                                            <div>
-                                                <span className="text-muted small fw-bold d-block">تمت إضافة المشروع تلقائياً</span>
-                                                <span className="fw-bold text-dark fs-5">{selectedProvider.projects[0].title}</span>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <p className="text-muted fw-semibold mb-3">لدى هذا المزود أكثر من مشروع لديك، اختر المشروع الذي تريد تقييمه:</p>
-                                            <div className="d-flex flex-column gap-2">
-                                                {selectedProvider.projects.map(project => (
-                                                    <label key={project.id}
-                                                        className={`p-4 rounded-4 border d-flex align-items-center gap-3 shadow-sm ${Number(selectedProjectId) === project.id ? 'border-warning bg-warning bg-opacity-10' : 'bg-white'}`}
-                                                        style={{ cursor: 'pointer' }}
-                                                    >
-                                                        <input
-                                                            type="radio"
-                                                            name="projectSelect"
-                                                            className="form-check-input"
-                                                            checked={Number(selectedProjectId) === project.id}
-                                                            onChange={() => setSelectedProjectId(project.id)}
-                                                        />
-                                                        <div>
-                                                            <span className="text-muted small fw-bold d-block">المشروع</span>
-                                                            <span className="fw-bold text-dark fs-5">{project.title}</span>
-                                                        </div>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
 
                             {/* اختيار النجوم */}
                             <div className="text-center mb-5">
@@ -272,7 +228,6 @@ const ReviewsTab = () => {
                                     style={{ borderColor: '#e2e8f0', fontSize: '18px', borderRadius: '12px', lineHeight: '1.8' }}
                                     value={reviewText}
                                     onChange={(e) => setReviewText(e.target.value)}
-                                    required
                                 ></textarea>
                             </div>
 
@@ -280,9 +235,9 @@ const ReviewsTab = () => {
                             <div className="d-flex justify-content-center gap-3 flex-wrap">
                                 <button
                                     type="submit"
-                                    disabled={!selectedProvider || !selectedProject || rating === 0 || submitting}
+                                    disabled={!selectedProject || rating === 0 || submitting}
                                     className="btn fw-bold px-5 py-3 rounded-pill shadow-sm text-white d-flex align-items-center gap-2"
-                                    style={{ backgroundColor: '#ff8a00', fontSize: '20px', opacity: (!selectedProvider || !selectedProject || rating === 0) ? 0.6 : 1 }}
+                                    style={{ backgroundColor: '#ff8a00', fontSize: '20px', opacity: (!selectedProject || rating === 0) ? 0.6 : 1 }}
                                 >
                                     {submitting ? <><FaSpinner className="fa-spin" /> جارٍ الإرسال...</> : <><FaStar /> إرسال التقييم</>}
                                 </button>
@@ -321,56 +276,65 @@ const ReviewsTab = () => {
                 </button>
             </div>
 
-            {/* عرض بطاقات التقييمات المقدمة */}
-            <div className="d-flex flex-column gap-4">
-                {givenReviews.length > 0 ? givenReviews.map(review => (
-                    <div key={review.id} className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white">
-                        
-                        <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
-                            <div className="d-flex gap-1">
-                                {renderStars(review.rating)}
+            {loading ? (
+                <div className="text-center py-5">
+                    <FaSpinner className="fa-spin fs-1 text-warning" />
+                </div>
+            ) : (
+                <div className="d-flex flex-column gap-4">
+                    {givenReviews.length > 0 ? givenReviews.map(review => (
+                        <div key={review.id} className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white">
+                            
+                            <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                                <div className="d-flex gap-1">
+                                    {renderStars(review.rate || review.rating)}
+                                </div>
+                                <span className="text-muted small fw-bold">
+                                    {review.created_at ? new Date(review.created_at).toLocaleDateString('ar-EG') : 'تاريخ غير متوفر'}
+                                </span>
                             </div>
-                            <span className="text-muted small fw-bold">{review.date}</span>
-                        </div>
-                        
-                        <div className="row mb-4 bg-light p-3 rounded-4 mx-0 border">
-                            <div className="col-md-6 mb-3 mb-md-0 d-flex align-items-center gap-3">
-                                <div className="bg-white p-2 rounded-circle shadow-sm text-secondary"><FaUserTie size={20} /></div>
-                                <div>
-                                    <span className="text-muted small fw-bold d-block">مزود الخدمة المُقَيَّم</span>
-                                    <span className="fw-bold text-dark fs-5">{review.providerName}</span>
+                            
+                            <div className="row mb-4 bg-light p-3 rounded-4 mx-0 border">
+                                <div className="col-md-6 mb-3 mb-md-0 d-flex align-items-center gap-3">
+                                    <div className="bg-white p-2 rounded-circle shadow-sm text-secondary"><FaUserTie size={20} /></div>
+                                    <div>
+                                        <span className="text-muted small fw-bold d-block">مزود الخدمة المُقَيَّم</span>
+                                        <span className="fw-bold text-dark fs-5">{review.to_user?.name || review.toUser?.name || 'مزود الخدمة'}</span>
+                                    </div>
+                                </div>
+                                <div className="col-md-6 d-flex align-items-center gap-3 border-start ps-md-4">
+                                    <div className="bg-white p-2 rounded-circle shadow-sm text-secondary"><FaHardHat size={20} /></div>
+                                    <div>
+                                        <span className="text-muted small fw-bold d-block">المشروع</span>
+                                        <span className="fw-bold text-dark fs-5">{review.project?.title || 'غير متوفر'}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="col-md-6 d-flex align-items-center gap-3 border-start ps-md-4">
-                                <div className="bg-white p-2 rounded-circle shadow-sm text-secondary"><FaHardHat size={20} /></div>
-                                <div>
-                                    <span className="text-muted small fw-bold d-block">المشروع</span>
-                                    <span className="fw-bold text-dark fs-5">{review.projectTitle}</span>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div className="position-relative p-4 rounded-4" style={{ backgroundColor: '#f8f9fa' }}>
-                            <FaQuoteRight className="position-absolute text-muted opacity-25" size={40} style={{ top: '10px', right: '15px' }} />
-                            <p className="text-dark fw-semibold fs-5 mb-0 position-relative z-1" style={{ lineHeight: '1.8' }}>
-                                "{review.reviewText}"
-                            </p>
+                            {review.comment && (
+                                <div className="position-relative p-4 rounded-4" style={{ backgroundColor: '#f8f9fa' }}>
+                                    <FaQuoteRight className="position-absolute text-muted opacity-25" size={40} style={{ top: '10px', right: '15px' }} />
+                                    <p className="text-dark fw-semibold fs-5 mb-0 position-relative z-1" style={{ lineHeight: '1.8' }}>
+                                        "{review.comment}"
+                                    </p>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                )) : (
-                    <div className="text-center py-5">
-                        <FaCommentDots className="text-muted mb-3 opacity-25" size={50} />
-                        <h4 className="text-muted fw-bold">لم تقم بتقييم أي مزود خدمة حتى الآن.</h4>
-                        <button 
-                            className="btn fw-bold px-4 py-3 rounded-pill shadow-sm text-white mt-4 d-flex align-items-center gap-2 mx-auto"
-                            style={{ backgroundColor: '#ff8a00', fontSize: '18px' }}
-                            onClick={() => setView('new')}
-                        >
-                            <FaPlus /> إضافة تقييم جديد
-                        </button>
-                    </div>
-                )}
-            </div>
+                    )) : (
+                        <div className="text-center py-5">
+                            <FaCommentDots className="text-muted mb-3 opacity-25" size={50} />
+                            <h4 className="text-muted fw-bold">لم تقم بتقييم أي مزود خدمة حتى الآن.</h4>
+                            <button 
+                                className="btn fw-bold px-4 py-3 rounded-pill shadow-sm text-white mt-4 d-flex align-items-center gap-2 mx-auto"
+                                style={{ backgroundColor: '#ff8a00', fontSize: '18px' }}
+                                onClick={() => setView('new')}
+                            >
+                                <FaPlus /> إضافة تقييم جديد
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { FaChevronRight, FaUserTie, FaHardHat, FaMoneyBillWave, FaRegClock, FaCalendarAlt, FaProjectDiagram, FaFileAlt, FaImage, FaFilePdf, FaStar, FaGlobe, FaLock, FaHourglassHalf, FaCheckCircle, FaTimesCircle, FaSpinner } from 'react-icons/fa';
+import clientApi from '../../../services/api/clientApi';
 
 const OfferDetails = ({ offer, offerType, onBack }) => {
     const [currentStatus, setCurrentStatus] = useState(offer?.status || 'pending');
+    const [actionLoading, setActionLoading] = useState(false);
 
-    // دالة لعرض التقييم بالنجوم
     const renderStars = (rating) => {
         const stars = [];
         const fullStars = Math.floor(rating);
@@ -22,11 +23,50 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
         return stars;
     };
 
+    // التفاعل مع الباك إند - قبول العرض
+    const handleAccept = async () => {
+        if (!window.confirm("هل أنت متأكد من قبول هذا العرض؟ سيتم رفض باقي العروض وبدء المشروع!")) return;
+        
+        setActionLoading(true);
+        try {
+            await clientApi.acceptOffer(offer.projectId, offer.id);
+            setCurrentStatus('accepted');
+            alert("تم قبول العرض وبدء المشروع بنجاح!");
+        } catch (error) {
+            console.error("خطأ في قبول العرض:", error);
+            alert(error.response?.data?.message || "حدث خطأ أثناء قبول العرض.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // التفاعل مع الباك إند - رفض العرض
+    const handleReject = async () => {
+        if (!window.confirm("هل أنت متأكد من رفض هذا العرض؟")) return;
+
+        setActionLoading(true);
+        try {
+            await clientApi.rejectOffer(offer.projectId, offer.id);
+            setCurrentStatus('rejected');
+            alert("تم رفض العرض بنجاح.");
+        } catch (error) {
+            console.error("خطأ في رفض العرض:", error);
+            alert(error.response?.data?.message || "حدث خطأ أثناء رفض العرض.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // زر العودة: نُرسل true إذا تم تعديل الحالة لكي نقوم بتحديث القائمة
+    const handleGoBack = () => {
+        const hasStatusChanged = (currentStatus !== offer.status);
+        onBack(hasStatusChanged); 
+    };
+
     return (
         <div className="mx-auto" style={{ maxWidth: '1000px' }}>
-            {/* زر العودة */}
             <button 
-                onClick={onBack} 
+                onClick={handleGoBack} 
                 className="btn btn-link text-decoration-none mb-4 p-0 d-inline-flex align-items-center gap-2 fw-bold"
                 style={{ color: '#1b2a47', fontSize: '20px' }}
             >
@@ -35,7 +75,6 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
 
             <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mb-5">
                 
-                {/* رأس الواجهة */}
                 <div className="text-center mb-5">
                     <div className="bg-light rounded-circle shadow-sm d-inline-flex justify-content-center align-items-center mb-3" style={{ width: '80px', height: '80px' }}>
                         {offerType === 'public' ? (
@@ -48,16 +87,15 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                         تفاصيل العرض
                     </h3>
                     <p className="text-muted fw-bold fs-5 mb-1">
-                        {offerType === 'public' ? `عرض عام #${offer.id + 100}` : `عرض خاص #${offer.id + 200}`}
+                        {offerType === 'public' ? `عرض عام #${offer.id}` : `عرض خاص #${offer.id}`}
                     </p>
                     <span className="badge bg-secondary bg-opacity-10 text-dark px-4 py-2 rounded-pill fw-bold fs-6">
                         <FaHourglassHalf className="ms-1" /> 
-                        {offer.status === 'pending' ? 'قيد الانتظار' : offer.status === 'accepted' ? 'مقبول' : 'مرفوض'}
+                        {currentStatus === 'pending' ? 'قيد الانتظار' : currentStatus === 'accepted' ? 'مقبول' : 'مرفوض'}
                     </span>
                     <hr className="text-muted my-4" style={{ opacity: '0.15' }} />
                 </div>
 
-                {/* 1. معلومات مزود الخدمة */}
                 <div className="mb-5">
                     <h5 className="fw-bold mb-4 d-flex align-items-center gap-2" style={{ color: '#1b2a47', fontSize: '20px' }}>
                         <FaUserTie className="text-warning" /> معلومات مزود الخدمة
@@ -92,7 +130,6 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                     </div>
                 </div>
 
-                {/* 2. عنوان المشروع */}
                 <div className="mb-5">
                     <h5 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1b2a47', fontSize: '20px' }}>
                         <FaHardHat className="text-success" /> عنوان المشروع
@@ -102,7 +139,6 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                     </div>
                 </div>
 
-                {/* 3. وصف العرض */}
                 {offer.details && (
                     <div className="mb-5">
                         <h5 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ color: '#1b2a47', fontSize: '20px' }}>
@@ -116,7 +152,6 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                     </div>
                 )}
 
-                {/* 4. تفاصيل العرض (المدة، السعر، تاريخ البدء) */}
                 <div className="mb-5">
                     <h5 className="fw-bold mb-4 d-flex align-items-center gap-2" style={{ color: '#1b2a47', fontSize: '20px' }}>
                         <FaMoneyBillWave className="text-success" /> تفاصيل العرض
@@ -158,7 +193,6 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                     </div>
                 </div>
 
-                {/* 5. مراحل المشروع */}
                 {offer.stages && offer.stages.length > 0 && (
                     <div className="mb-5">
                         <h5 className="fw-bold mb-4 d-flex align-items-center gap-2" style={{ color: '#1b2a47', fontSize: '20px' }}>
@@ -186,7 +220,6 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                     </div>
                 )}
 
-                {/* 6. المرفقات (الملفات والصور) */}
                 {offer.attachments && offer.attachments.length > 0 && (
                     <div className="mb-5">
                         <h5 className="fw-bold mb-4 d-flex align-items-center gap-2" style={{ color: '#1b2a47', fontSize: '20px' }}>
@@ -198,18 +231,17 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                                     <div className="border rounded-4 p-4 d-flex flex-column align-items-center justify-content-center text-center shadow-sm bg-light h-100" style={{ cursor: 'pointer', transition: 'all 0.3s ease', minHeight: '140px' }}
                                         onMouseOver={(e) => { e.currentTarget.style.borderColor = '#ff8a00'; e.currentTarget.style.transform = 'translateY(-3px)'; }}
                                         onMouseOut={(e) => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.transform = ''; }}
+                                        onClick={() => window.open(att.path || '#', '_blank')}
                                     >
-                                        {att.type === 'image' ? (
+                                        {(att.file_type === 'image' || !att.file_type) ? (
                                             <>
                                                 <FaImage className="text-primary mb-2" style={{ fontSize: '48px' }} />
-                                                <span className="fw-bold text-dark small text-truncate w-100">{att.title}</span>
-                                                <span className="text-muted small fw-semibold mt-1">صورة</span>
+                                                <span className="fw-bold text-dark small text-truncate w-100">{att.description || 'مرفق'}</span>
                                             </>
                                         ) : (
                                             <>
                                                 <FaFilePdf className="text-danger mb-2" style={{ fontSize: '48px' }} />
-                                                <span className="fw-bold text-dark small text-truncate w-100">{att.title}</span>
-                                                <span className="text-muted small fw-semibold mt-1">ملف PDF</span>
+                                                <span className="fw-bold text-dark small text-truncate w-100">{att.description || 'مستند'}</span>
                                             </>
                                         )}
                                     </div>
@@ -221,7 +253,6 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
 
                 <hr className="text-muted my-5" style={{ opacity: '0.1' }} />
 
-                {/* 7. تاريخ العرض */}
                 <div className="text-center mb-5">
                     <div className="bg-light p-4 rounded-4 border d-inline-block">
                         <span className="fw-bold text-muted fs-5">
@@ -231,63 +262,44 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
                     </div>
                 </div>
 
-                {/* 8. أزرار الإجراءات (قبول / قيد الدراسة / رفض) */}
                 <div className="text-center">
                     <div className="bg-light p-5 rounded-4 border shadow-sm">
                         <h5 className="fw-bold mb-4" style={{ color: '#1b2a47', fontSize: '20px' }}>
                             إجراءات العرض
                         </h5>
                         <div className="d-flex justify-content-center gap-3 flex-wrap">
-                            {/* زر قبول العرض */}
                             <button
-                                onClick={() => setCurrentStatus('accepted')}
+                                onClick={handleAccept}
                                 className={`btn fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2 ${
                                     currentStatus === 'accepted' ? 'btn-success' : 'btn-outline-success'
                                 }`}
                                 style={{ fontSize: '18px', minWidth: '180px', justifyContent: 'center' }}
-                                disabled={currentStatus === 'accepted'}
+                                disabled={currentStatus === 'accepted' || actionLoading}
                             >
-                                <FaCheckCircle /> 
+                                {actionLoading && currentStatus !== 'accepted' ? <FaSpinner className="fa-spin" /> : <FaCheckCircle />}
                                 {currentStatus === 'accepted' ? 'تم القبول ✓' : 'قبول العرض'}
                             </button>
 
-                            {/* زر قيد الدراسة */}
                             <button
-                                onClick={() => setCurrentStatus('studying')}
-                                className={`btn fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2 ${
-                                    currentStatus === 'studying' ? 'btn-warning text-dark' : 'btn-outline-warning text-dark'
-                                }`}
-                                style={{ fontSize: '18px', minWidth: '180px', justifyContent: 'center' }}
-                                disabled={currentStatus === 'studying'}
-                            >
-                                <FaSpinner className={currentStatus === 'studying' ? 'fa-spin' : ''} /> 
-                                {currentStatus === 'studying' ? 'قيد الدراسة ✓' : 'قيد الدراسة'}
-                            </button>
-
-                            {/* زر رفض العرض */}
-                            <button
-                                onClick={() => setCurrentStatus('rejected')}
+                                onClick={handleReject}
                                 className={`btn fw-bold px-5 py-3 rounded-pill shadow-sm d-flex align-items-center gap-2 ${
                                     currentStatus === 'rejected' ? 'btn-danger' : 'btn-outline-danger'
                                 }`}
                                 style={{ fontSize: '18px', minWidth: '180px', justifyContent: 'center' }}
-                                disabled={currentStatus === 'rejected'}
+                                disabled={currentStatus === 'rejected' || currentStatus === 'accepted' || actionLoading}
                             >
-                                <FaTimesCircle /> 
+                                {actionLoading && currentStatus !== 'rejected' ? <FaSpinner className="fa-spin" /> : <FaTimesCircle />}
                                 {currentStatus === 'rejected' ? 'تم الرفض ✓' : 'رفض العرض'}
                             </button>
                         </div>
 
-                        {/* رسالة تأكيد عند اختيار حالة */}
-                        {currentStatus !== 'pending' && currentStatus !== offer.status && (
+                        {currentStatus !== 'pending' && (
                             <div className={`mt-4 p-3 rounded-3 fw-bold fs-5 ${
                                 currentStatus === 'accepted' ? 'bg-success bg-opacity-10 text-success' :
-                                currentStatus === 'studying' ? 'bg-warning bg-opacity-10 text-warning' :
                                 'bg-danger bg-opacity-10 text-danger'
                             }`}>
-                                {currentStatus === 'accepted' && '✅ تم قبول هذا العرض، سيتم إعلام مزود الخدمة بقرارك.'}
-                                {currentStatus === 'studying' && '⏳ تم وضع هذا العرض قيد الدراسة، سيتم إعلامك لاحقاً.'}
-                                {currentStatus === 'rejected' && '❌ تم رفض هذا العرض، يمكنك مراجعة العروض الأخرى.'}
+                                {currentStatus === 'accepted' && '✅ تم قبول هذا العرض بنجاح وبدأ المشروع.'}
+                                {currentStatus === 'rejected' && '❌ تم رفض هذا العرض.'}
                             </div>
                         )}
                     </div>
@@ -298,4 +310,3 @@ const OfferDetails = ({ offer, offerType, onBack }) => {
 };
 
 export default OfferDetails;
-

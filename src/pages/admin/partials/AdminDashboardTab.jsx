@@ -8,7 +8,7 @@ import {
 import { fetchAdminDashboard } from '../../../services/api/adminApi';
 import './admin-tabs.css';
 
-// بيانات وهمية احتياطية (عند عدم استجابة الباك)
+// بيانات وهمية احتياطية
 const mockStats = {
   totalUsers: 248,
   usersByType: {
@@ -31,8 +31,8 @@ const AdminDashboardTab = ({ setActiveTab }) => {
       setLoading(true);
       try {
         const res = await fetchAdminDashboard();
-        const data = res.data?.data;
-if (data) setStats(data);
+        const data = res.data?.data || res.data;
+        if (data) setStats(data);
       } catch {
         // ابقِ على البيانات الوهمية
       } finally {
@@ -66,13 +66,13 @@ if (data) setStats(data);
         </p>
       </div>
 
-      {/* ===== بطاقات رئيسية: المستخدمين والمشاريع والعروض ===== */}
+      {/* ===== بطاقات رئيسية ===== */}
       <div className="row g-4 mb-4">
         <div className="col-md-4 col-6">
           <div className="admin-stat-card p-3 p-md-4 d-flex flex-row align-items-center justify-content-between h-100" style={{ borderBottomColor: '#0d6efd' }}>
             <div>
               <p className="text-muted fw-bold mb-1" style={{ fontSize: '17px' }}>إجمالي المستخدمين</p>
-              <h2 className="fw-bold mb-0 text-primary" style={{ fontSize: '38px' }}>{stats.totalUsers}</h2>
+              <h2 className="fw-bold mb-0 text-primary" style={{ fontSize: '38px' }}>{stats?.totalUsers || 0}</h2>
             </div>
             <div className="bg-primary bg-opacity-10 text-primary p-3 rounded-circle fs-3"><FaUsers /></div>
           </div>
@@ -83,7 +83,7 @@ if (data) setStats(data);
             <div>
               <p className="text-muted fw-bold mb-1" style={{ fontSize: '17px' }}>إجمالي المشاريع</p>
               <h2 className="fw-bold mb-0" style={{ color: '#ff8a00', fontSize: '38px' }}>
-                {stats.projects.open + stats.projects.completed + stats.projects.suspended}
+                {(stats?.projects?.open || 0) + (stats?.projects?.completed || 0) + (stats?.projects?.suspended || 0)}
               </h2>
             </div>
             <div className="bg-warning bg-opacity-10 text-warning p-3 rounded-circle fs-3"><FaListAlt /></div>
@@ -94,7 +94,7 @@ if (data) setStats(data);
           <div className="admin-stat-card p-3 p-md-4 d-flex flex-row align-items-center justify-content-between h-100" style={{ borderBottomColor: '#10b981' }}>
             <div>
               <p className="text-muted fw-bold mb-1" style={{ fontSize: '17px' }}>إجمالي العروض</p>
-              <h2 className="fw-bold mb-0 text-success" style={{ fontSize: '38px' }}>{stats.offers.total}</h2>
+              <h2 className="fw-bold mb-0 text-success" style={{ fontSize: '38px' }}>{stats?.offers?.total || 0}</h2>
             </div>
             <div className="bg-success bg-opacity-10 text-success p-3 rounded-circle fs-3"><FaFileInvoiceDollar /></div>
           </div>
@@ -116,7 +116,8 @@ if (data) setStats(data);
                 <div className="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" style={{ width: '50px', height: '50px', backgroundColor: `${card.color}1a`, color: card.color }}>
                   {card.icon}
                 </div>
-                <h4 className="fw-bold mb-0" style={{ fontSize: '30px', color: card.color }}>{stats.usersByType[card.key] || 0}</h4>
+                {/* 👈 تم إضافة ?. هنا لحماية الكود من الانهيار */}
+                <h4 className="fw-bold mb-0" style={{ fontSize: '30px', color: card.color }}>{stats?.usersByType?.[card.key] || 0}</h4>
                 <span className="text-muted fw-bold" style={{ fontSize: '16px' }}>{card.label}</span>
               </div>
             </div>
@@ -138,15 +139,15 @@ if (data) setStats(data);
             <div className="d-flex flex-column gap-3">
               <div className="d-flex justify-content-between align-items-center p-3 rounded-3" style={{ backgroundColor: 'rgba(13,110,253,0.06)' }}>
                 <span className="fw-bold text-muted"><FaClock className="ms-1 text-primary" /> المشاريع المفتوحة</span>
-                <span className="badge bg-primary rounded-pill fw-bold fs-6 px-3">{stats.projects.open}</span>
+                <span className="badge bg-primary rounded-pill fw-bold fs-6 px-3">{stats?.projects?.open || 0}</span>
               </div>
               <div className="d-flex justify-content-between align-items-center p-3 rounded-3" style={{ backgroundColor: 'rgba(16,185,129,0.06)' }}>
                 <span className="fw-bold text-muted"><FaCheckCircle className="ms-1 text-success" /> المشاريع المكتملة</span>
-                <span className="badge bg-success rounded-pill fw-bold fs-6 px-3">{stats.projects.completed}</span>
+                <span className="badge bg-success rounded-pill fw-bold fs-6 px-3">{stats?.projects?.completed || 0}</span>
               </div>
               <div className="d-flex justify-content-between align-items-center p-3 rounded-3" style={{ backgroundColor: 'rgba(239,68,68,0.06)' }}>
                 <span className="fw-bold text-muted"><FaClock className="ms-1 text-danger" /> المشاريع المعلقة</span>
-                <span className="badge bg-danger rounded-pill fw-bold fs-6 px-3">{stats.projects.suspended}</span>
+                <span className="badge bg-danger rounded-pill fw-bold fs-6 px-3">{stats?.projects?.suspended || 0}</span>
               </div>
             </div>
           </div>
@@ -164,11 +165,11 @@ if (data) setStats(data);
             <div className="d-flex flex-column gap-3">
               <div className="d-flex justify-content-between align-items-center p-3 rounded-3" style={{ backgroundColor: 'rgba(13,110,253,0.06)' }}>
                 <span className="fw-bold text-muted"><FaFileInvoiceDollar className="ms-1 text-primary" /> العروض المقدمة</span>
-                <span className="badge bg-primary rounded-pill fw-bold fs-6 px-3">{stats.offers.total}</span>
+                <span className="badge bg-primary rounded-pill fw-bold fs-6 px-3">{stats?.offers?.total || 0}</span>
               </div>
               <div className="d-flex justify-content-between align-items-center p-3 rounded-3" style={{ backgroundColor: 'rgba(16,185,129,0.06)' }}>
                 <span className="fw-bold text-muted"><FaCheckDouble className="ms-1 text-success" /> العروض المقبولة</span>
-                <span className="badge bg-success rounded-pill fw-bold fs-6 px-3">{stats.offers.accepted}</span>
+                <span className="badge bg-success rounded-pill fw-bold fs-6 px-3">{stats?.offers?.accepted || 0}</span>
               </div>
             </div>
           </div>
@@ -182,7 +183,7 @@ if (data) setStats(data);
             <h5 className="fw-bold mb-1" style={{ fontSize: '24px' }}>إجراءات سريعة</h5>
             <p className="mb-0 text-white-50 fw-semibold">إدارة المستخدمين، مراجعة المشاريع والعروض، ومتابعة الشكاوى.</p>
           </div>
-<div className="d-flex gap-2 flex-wrap">
+          <div className="d-flex gap-2 flex-wrap">
             <button className="btn-admin-orange d-inline-flex align-items-center gap-2" onClick={() => setActiveTab('provider-requests')}>
               <FaUserTie /> طلبات المزودين
             </button>

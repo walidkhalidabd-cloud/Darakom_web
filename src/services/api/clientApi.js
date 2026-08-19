@@ -4,6 +4,9 @@ import apiReq from '../apiReq';
 // API Service للعميل - جميع النقاط المتوافقة مع الباك
 // ==========================================
 
+// ----- لوحة التحكم (Dashboard) -----
+export const fetchClientDashboard = () => apiReq.get('/client/dashboard');
+
 // ----- الملف الشخصي (مشترك) -----
 export const fetchClientProfile = () => apiReq.get('/profile');
 export const updateClientProfile = (data) => apiReq.put('/profile/update', data);
@@ -21,11 +24,16 @@ export const removeFavorite = (favoriteUserId) => apiReq.delete(`/favorites/${fa
 // ----- المشاريع -----
 export const fetchClientProjects = () => apiReq.get('/client/projects');
 export const fetchClientProjectDetails = (id) => apiReq.get(`/client/projects/${id}`);
+export const createClientProject = (data) => apiReq.post('/projects', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+});
 
 // ----- عروض المشروع (الاستلام/القبول/الرفض) -----
 export const fetchProjectOffers = (projectId) => apiReq.get(`/client/projects/${projectId}/offers`);
 export const acceptOffer = (projectId, offerId) => apiReq.post(`/client/projects/${projectId}/offers/${offerId}/accept`);
 export const rejectOffer = (projectId, offerId) => apiReq.post(`/client/projects/${projectId}/offers/${offerId}/reject`);
+export const fetchPublicOffers = () => apiReq.get('/client/offers/public');
+export const fetchPrivateOffers = () => apiReq.get('/client/offers/private');
 
 // ----- تقييم المشروع -----
 export const rateProject = (projectId, data) => apiReq.post(`/client/projects/${projectId}/rate`, data);
@@ -46,23 +54,15 @@ export const fetchClientRating = (ratingId) => apiReq.get(`/client/ratings/${rat
 export const updateClientRating = (ratingId, data) => apiReq.put(`/client/ratings/${ratingId}`, data);
 export const deleteClientRating = (ratingId) => apiReq.delete(`/client/ratings/${ratingId}`);
 
-// =============================================================
-// وظائف توافقية (Compatibility) - الواجهات تعتمد عليها حالياً
-// لا تحذفها حتى لا تنكسر الواجهات
-// =============================================================
-
-// ----- متابعة مشاريع العميل -----
-// الباك يوفر قائمة المشاريع + خطوات المشروع بشكل فعلي، وليس مسار tracking مخصص.
 export const fetchClientOngoingProjects = () => apiReq.get('/client/projects');
 export const fetchClientProjectTracking = (id) => apiReq.get(`/client/projects/${id}/steps`);
-
-// ============================================================
-// ملاحظة: المسارات التالية لا تزال غير موجودة في الباك فعلياً:
-// client/notifications, client/reviews, client/favorites,
-// client/tracking/projects
-// ============================================================
+export const updateClientProject = (projectId, data) => apiReq.put(`/projects/${projectId}`, data);
+export const deleteClientProject = (projectId) => apiReq.delete(`/projects/${projectId}`);
+export const fetchClientFavorites = () => apiReq.get('/favorites');
+export const toggleClientFavorite = (data) => apiReq.post('/favorites/toggle', data);
 
 export default {
+  fetchClientDashboard,
   fetchClientProfile,
   updateClientProfile,
   fetchClientComplaints,
@@ -73,9 +73,12 @@ export default {
   removeFavorite,
   fetchClientProjects,
   fetchClientProjectDetails,
+  createClientProject,
   fetchProjectOffers,
   acceptOffer,
   rejectOffer,
+  fetchPublicOffers,
+  fetchPrivateOffers,
   rateProject,
   sendProjectInvitation,
   cancelInvitation,

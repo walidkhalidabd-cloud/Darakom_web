@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaMoneyBillWave, FaUserTie, FaRegClock, FaFileContract, FaCheckCircle, FaSpinner, FaTruck, FaStar, FaArrowRight, FaPlus, FaExclamationTriangle, FaCheck, FaHourglassHalf, FaEdit, FaTrash, FaSave, FaTimes, FaMapMarkerAlt, FaBuilding, FaCalendarAlt, FaEye, FaTimesCircle, FaHardHat, FaPaperPlane } from 'react-icons/fa';
 import OfferDetails from './OfferDetails';
 import ProjectRatingForm from '../../../components/ProjectRatingForm';
+import clientApi from '../../../services/api/clientApi'; // تأكد من المسار حسب هيكلية مشروعك
 
 const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
     const [offerStatus, setOfferStatus] = useState('pending');
@@ -13,196 +14,67 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         title: '', description: '', governorate: '', area: '', providerType: '', tenderDays: ''
     });
     const [editDocs, setEditDocs] = useState([]);
+    
+    // States الخاصة بالباك إند
+    const [allProjects, setAllProjects] = useState([]);
     const [projectOffers, setProjectOffers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
 
-    // بيانات وهمية: العروض المستلمة لكل مشروع قيد الانتظار
-    const receivedOffersData = {
-        5: [
-            {
-                id: 101,
-                providerName: 'مؤسسة التشطيب الذهبي',
-                providerType: 'مقاول تشطيبات',
-                rating: 4.7,
-                price: '25,000',
-                duration: '25 يوم',
-                offerDate: '2026/04/16',
-                details: 'نقدم لكم عرضنا لتشطيب الشقة كاملة بأعلى المواصفات، يشمل السيراميك والدهانات والسباكة والكهرباء. لدينا فريق عمل متكامل وخبرة تتجاوز 15 عاماً.',
-                status: 'pending',
-                startDate: '2026/05/01',
-                stages: [
-                    { name: 'أعمال السباكة والكهرباء', duration: '7 أيام' },
-                    { name: 'أعمال السيراميك والبلاط', duration: '10 أيام' },
-                    { name: 'أعمال الدهان والديكور', duration: '8 أيام' }
-                ]
-            },
-            {
-                id: 102,
-                providerName: 'م. سامر الحسن',
-                providerType: 'مهندس ديكور',
-                rating: 4.5,
-                price: '22,000',
-                duration: '20 يوم',
-                offerDate: '2026/04/17',
-                details: 'عرض تشطيب شامل مع لمسات ديكور عصرية. نستخدم مواد عالية الجودة ونوفر ضمان لمدة عام على جميع الأعمال.',
-                status: 'pending',
-                startDate: '2026/05/05',
-                stages: [
-                    { name: 'التجهيزات الأولية', duration: '5 أيام' },
-                    { name: 'أعمال التشطيب الرئيسية', duration: '10 أيام' },
-                    { name: 'اللمسات النهائية والتسليم', duration: '5 أيام' }
-                ]
-            },
-            {
-                id: 103,
-                providerName: 'شركة البيان للتشطيبات',
-                providerType: 'شركة مقاولات',
-                rating: 4.9,
-                price: '30,000',
-                duration: '30 يوم',
-                offerDate: '2026/04/18',
-                details: 'عرض متكامل يشمل تشطيب الشقة بأفضل المواد المستوردة مع الإشراف الهندسي الكامل. نوفر كفالة لمدة 5 سنوات على جميع الأعمال.',
-                status: 'pending',
-                startDate: '2026/05/10',
-                stages: [
-                    { name: 'أعمال التكسير والتمديدات', duration: '7 أيام' },
-                    { name: 'أعمال البناء واللياسة', duration: '8 أيام' },
-                    { name: 'أعمال التشطيب النهائي', duration: '15 يوم' }
-                ]
-            }
-        ],
-        6: [
-            {
-                id: 201,
-                providerName: 'مكتب الإبداع الهندسي',
-                providerType: 'مكتب هندسي',
-                rating: 4.6,
-                price: '12,000',
-                duration: '15 يوم',
-                offerDate: '2026/04/19',
-                details: 'تصميم داخلي متكامل للمكتب يشمل التخطيط المكاني وتصميم الأثاث والإضاءة. نقدم 3 مقترحات تصميمية مختلفة مع إمكانية التعديل.',
-                status: 'pending',
-                startDate: '2026/05/01',
-                stages: [
-                    { name: 'رفع القياسات والمساحات', duration: '3 أيام' },
-                    { name: 'التصاميم الأولية', duration: '5 أيام' },
-                    { name: 'التصاميم النهائية والتسليم', duration: '7 أيام' }
-                ]
-            }
-        ]
+   
+
+    const fetchProjects = async () => {
+        try {
+            setLoading(true);
+            const response = await clientApi.fetchClientProjects();
+            const projectsData = response.data?.data || response.data || [];
+            
+            // تهيئة البيانات القادمة من الباك إند لتتطابق مع التصميم
+            const formattedProjects = projectsData.map(apiProject => {
+                // تحديد حالة المشروع بناءً على الباك إند
+                let executionStatus = apiProject.execution_status || 'not_started';
+                let progress = 0;
+                if (executionStatus === 'in_progress') progress = 50;
+                if (executionStatus === 'finished') progress = 100;
+
+                return {
+                    id: apiProject.id,
+                    projectTitle: apiProject.title || 'مشروع بدون عنوان',
+                    providerName: apiProject.performer?.user?.name || null,
+                    providerType: apiProject.projectType?.name || apiProject.providerTypeNeeded || 'غير محدد',
+                    price: apiProject.budget || apiProject.price || '0',
+                    duration: apiProject.duration_days ? `${apiProject.duration_days} يوم` : 'غير محدد',
+                    datePosted: new Date(apiProject.created_at).toLocaleDateString('ar-EG'),
+                    dateAccepted: apiProject.start_date || '',
+                    dateCompleted: apiProject.end_date || '',
+                    details: apiProject.description || '',
+                    progress: progress,
+                    status: executionStatus === 'finished' ? 'مكتمل' : (executionStatus === 'in_progress' ? 'قيد التنفيذ' : 'بانتظار العروض'),
+                    offersCount: apiProject.offers?.length || 0,
+                    daysRemaining: apiProject.tender_days || 0,
+                    governorate: apiProject.province?.name || '',
+                    area: apiProject.area || '',
+                    backendStatus: executionStatus,
+                    description: apiProject.description || '',
+                    milestones: apiProject.steps || [] // جلب الخطوات إن وجدت
+                };
+            });
+            setAllProjects(formattedProjects);
+        } catch (error) {
+            console.error("خطأ في جلب المشاريع:", error);
+        } finally {
+            setLoading(false);
+        }
     };
+    // جلب بيانات المشاريع عند تحميل المكون
+    useEffect(() => {
+        fetchProjects();
+    }, []);
 
-    const pendingOffers = [
-        {
-            id: 5,
-            projectTitle: 'تشطيب شقة سكنية 120م',
-            providerType: 'فني بلاط',
-            price: '0 - بانتظار العروض',
-            duration: '7 أيام',
-            datePosted: '2026/04/15',
-            details: 'تشطيب كامل لشقة سكنية مساحة 120م تشمل بلاط وسيراميك ودهان وكهرباء وسباكة.',
-            status: 'بانتظار العروض',
-            progress: 0,
-            offersCount: 3,
-            daysRemaining: 5,
-            governorate: 'دمشق',
-            area: '120',
-            providerTypeNeeded: 'فني بلاط',
-            tenderDays: 7,
-            description: 'تشطيب كامل لشقة سكنية مساحة 120م تشمل بلاط وسيراميك ودهان وكهرباء وسباكة.'
-        },
-        {
-            id: 6,
-            projectTitle: 'تصميم داخلي لمكتب',
-            providerType: 'مهندس معماري',
-            price: '0 - بانتظار العروض',
-            duration: '10 أيام',
-            datePosted: '2026/04/18',
-            details: 'تصميم داخلي لمكتب مساحة 80م يشمل المخططات والتصور ثلاثي الأبعاد.',
-            status: 'بانتظار العروض',
-            progress: 0,
-            offersCount: 0,
-            daysRemaining: 8,
-            governorate: 'حلب',
-            area: '80',
-            providerTypeNeeded: 'مهندس معماري',
-            tenderDays: 10,
-            description: 'تصميم داخلي لمكتب مساحة 80م يشمل المخططات والتصور ثلاثي الأبعاد.'
-        }
-    ];
-
-    const ongoingOffers = [
-        {
-            id: 1,
-            projectTitle: 'بناء عظم - مساحة 400م',
-            providerName: 'مؤسسة البناء الذهبي',
-            providerType: 'مقاول معتمد',
-            price: '150,000',
-            duration: '6 أشهر',
-            dateAccepted: '2026/05/01',
-            details: 'يشمل السعر توريد جميع المواد الأساسية (حديد، اسمنت، طابوق) حسب المخططات الهندسية المرفقة، مع الالتزام بالجدول الزمني.',
-            progress: 65,
-            status: 'قيد التنفيذ',
-            milestones: [
-                { name: 'المرحلة الأولى: الأساسات', completed: true },
-                { name: 'المرحلة الثانية: الهيكل الخرساني', completed: true },
-                { name: 'المرحلة الثالثة: أعمال الطابوق واللياسة', completed: false },
-                { name: 'المرحلة الرابعة: التشطيبات النهائية', completed: false }
-            ]
-        },
-        {
-            id: 4,
-            projectTitle: 'بناء عظم - مساحة 400م',
-            providerName: 'مؤسسة البناء الذهبي',
-            providerType: 'مقاول معتمد',
-            price: '150,000',
-            duration: '6 أشهر',
-            dateAccepted: '2026/05/01',
-            details: 'يشمل السعر توريد جميع المواد الأساسية (حديد، اسمنت، طابوق) حسب المخططات الهندسية المرفقة.',
-            progress: 30,
-            status: 'قيد التنفيذ',
-            milestones: [
-                { name: 'المرحلة الأولى: الأساسات', completed: true },
-                { name: 'المرحلة الثانية: الهيكل الخرساني', completed: false },
-                { name: 'المرحلة الثالثة: أعمال الطابوق واللياسة', completed: false }
-            ]
-        }
-    ];
-
-    const completedOffers = [
-        {
-            id: 2,
-            projectTitle: 'تصميم داخلي لفيلا مودرن',
-            providerName: 'مكتب الإبداع الهندسي',
-            providerType: 'مكتب هندسي',
-            price: '45,000',
-            duration: 'شهرين',
-            dateCompleted: '2026/02/15',
-            details: 'تصميم 3D لجميع الفراغات الداخلية مع المخططات التنفيذية للكهرباء والسباكة والأسقف المستعارة.',
-            progress: 100,
-            status: 'مكتمل',
-            milestones: [
-                { name: 'المرحلة الأولى: التصاميم الأولية', completed: true },
-                { name: 'المرحلة الثانية: التصاميم التنفيذية', completed: true },
-                { name: 'المرحلة الثالثة: الإشراف على التنفيذ', completed: true }
-            ]
-        },
-        {
-            id: 3,
-            projectTitle: 'تأسيس شبكة كاميرات مراقبة',
-            providerName: 'م. أحمد خالد',
-            providerType: 'مهندس اتصالات',
-            price: '8,500',
-            duration: 'أسبوعين',
-            dateCompleted: '2025/11/20',
-            details: 'توريد وتركيب 16 كاميرا خارجية وداخلية بدقة 4K مع جهاز التسجيل والربط على الجوال.',
-            progress: 100,
-            status: 'مكتمل',
-            milestones: [
-                { name: 'المرحلة الأولى: التوصيلات والتمديدات', completed: true },
-                { name: 'المرحلة الثانية: التركيب والتشغيل', completed: true }
-            ]
-        }
-    ];
+    // فلترة المشاريع حسب التبويبات الثلاثة
+    const pendingOffers = allProjects.filter(p => p.backendStatus === 'not_started');
+    const ongoingOffers = allProjects.filter(p => p.backendStatus === 'in_progress');
+    const completedOffers = allProjects.filter(p => p.backendStatus === 'finished');
 
     const projects = offerStatus === 'pending' ? pendingOffers 
         : offerStatus === 'ongoing' ? ongoingOffers 
@@ -228,17 +100,41 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         setEditDocs([]);
     };
 
-    const saveEdit = (e) => {
+    const saveEdit = async (e) => {
         e.preventDefault();
-        alert(`تم تعديل المشروع "${editForm.title}" وإعادة طرحه بنجاح!`);
-        setTrackingView('list');
-        setSelectedProject(null);
-        setEditDocs([]);
+        try {
+            setActionLoading(true);
+            const payload = {
+                title: editForm.title,
+                description: editForm.description,
+                area: editForm.area,
+                tender_days: editForm.tenderDays,
+                // يمكنك إضافة الحقول الإضافية التي يطلبها الـ API هنا مثل المحافظة والنوع
+            };
+            
+            await clientApi.updateClientProject(selectedProject.id, payload);
+            alert(`تم تعديل المشروع "${editForm.title}" بنجاح!`);
+            setTrackingView('list');
+            setSelectedProject(null);
+            fetchProjects();
+        } catch (error) {
+            console.error("خطأ في تعديل المشروع", error);
+            alert("حدث خطأ أثناء تعديل المشروع.");
+        } finally {
+            setActionLoading(false);
+        }
     };
 
-    const handleDelete = (projectId) => {
+    const handleDelete = async (projectId) => {
         if (window.confirm('هل أنت متأكد من حذف هذا المشروع؟')) {
-            alert(`تم حذف المشروع رقم ${projectId}`);
+            try {
+                await clientApi.deleteClientProject(projectId);
+                alert(`تم حذف المشروع بنجاح`);
+                fetchProjects();
+            } catch (error) {
+                console.error("خطأ في حذف المشروع", error);
+                alert("حدث خطأ أثناء حذف المشروع.");
+            }
         }
     };
 
@@ -246,10 +142,67 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
     const handleEditDocChange = (id, field, value) => setEditDocs(editDocs.map(doc => doc.id === id ? { ...doc, [field]: value } : doc));
     const removeEditDocRow = (id) => setEditDocs(editDocs.filter(doc => doc.id !== id));
 
-    const viewProjectOffers = (project) => {
-        setProjectOffers(receivedOffersData[project.id] || []);
+    const viewProjectOffers = async (project) => {
         setSelectedProject(project);
         setTrackingView('view-offers');
+        setProjectOffers([]);
+        try {
+            setLoading(true);
+            const response = await clientApi.fetchProjectOffers(project.id);
+            const offersData = response.data?.data || response.data || [];
+            
+            const formattedOffers = offersData.map(offer => ({
+                id: offer.id,
+                providerName: offer.provider?.user?.name || 'مزود خدمة',
+                providerType: offer.provider?.role?.name || 'مستقل',
+                rating: offer.provider?.rating || 0,
+                price: offer.price,
+                duration: `${offer.duration_days || 0} يوم`,
+                offerDate: new Date(offer.created_at).toLocaleDateString('ar-EG'),
+                details: offer.details,
+                status: offer.status || 'pending', 
+                startDate: offer.start_date || '-',
+                stages: offer.stages || []
+            }));
+            
+            setProjectOffers(formattedOffers);
+        } catch (error) {
+            console.error("خطأ في جلب العروض:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAcceptOffer = async (offerId) => {
+        if (!window.confirm('هل أنت متأكد من قبول هذا العرض؟ سيتم رفض باقي العروض تلقائياً.')) return;
+        try {
+            setActionLoading(true);
+            await clientApi.acceptOffer(selectedProject.id, offerId);
+            alert('تم قبول العرض بنجاح وبدء التنفيذ!');
+            fetchProjects();
+            setTrackingView('list');
+            setOfferStatus('ongoing');
+        } catch (error) {
+            console.error("خطأ في قبول العرض", error);
+            alert("حدث خطأ أثناء قبول العرض.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleRejectOffer = async (offerId) => {
+        if (!window.confirm('هل أنت متأكد من رفض هذا العرض؟')) return;
+        try {
+            setActionLoading(true);
+            await clientApi.rejectOffer(selectedProject.id, offerId);
+            alert('تم رفض العرض!');
+            viewProjectOffers(selectedProject);
+        } catch (error) {
+            console.error("خطأ في رفض العرض", error);
+            alert("حدث خطأ أثناء رفض العرض.");
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const getStatusBadge = (status) => {
@@ -281,7 +234,6 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         return stars;
     };
 
-    // دالة لإرجاع لون الحدود للبطاقة حسب الحالة (مثل OffersReceivedTab)
     const getBorderColor = (status) => {
         switch(status) {
             case 'pending': return 'border-warning';
@@ -291,7 +243,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         }
     };
 
-    // عرض تفاصيل العرض (OfferDetails)
+    // 1. واجهة تفاصيل العرض الفردي
     if (trackingView === 'offer-detail' && selectedOffer) {
         return (
             <OfferDetails 
@@ -302,7 +254,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         );
     }
 
-    // واجهة عرض العروض المستلمة للمشروع قيد الانتظار (بنفس تصميم OffersReceivedTab)
+    // 2. واجهة عرض كل العروض المستلمة للمشروع
     if (trackingView === 'view-offers' && selectedProject) {
         return (
             <div className="mx-auto" style={{ maxWidth: '100%' }}>
@@ -320,12 +272,16 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                     </div>
                 </div>
 
-                {projectOffers.length > 0 ? (
+                {loading ? (
+                    <div className="text-center py-5">
+                        <FaSpinner className="fa-spin text-primary mb-3" size={40} />
+                        <h5 className="text-muted fw-bold">جاري تحميل العروض...</h5>
+                    </div>
+                ) : projectOffers.length > 0 ? (
                     <div className="d-flex flex-column gap-4">
                         {projectOffers.map(offer => (
                             <div key={offer.id} className={`card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white border-end border-4 ${getBorderColor(offer.status)}`}>
                                 
-                                {/* رأس البطاقة: رقم العرض والحالة */}
                                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
                                     <div className="d-flex align-items-center gap-2">
                                         <FaHardHat className="text-primary" size={20} />
@@ -334,7 +290,6 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                     {getStatusBadge(offer.status)}
                                 </div>
 
-                                {/* معلومات مزود الخدمة مع التقييم والمشروع */}
                                 <div className="row mb-4 p-3 rounded-4 mx-0 bg-light">
                                     <div className="col-md-6 mb-3 mb-md-0 d-flex align-items-center gap-3">
                                         <div className="bg-white p-2 rounded-circle shadow-sm text-primary"><FaUserTie size={20} /></div>
@@ -356,7 +311,6 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                     </div>
                                 </div>
 
-                                {/* صف التقييم + السعر + المدة */}
                                 <div className="row mb-4 g-3">
                                     <div className="col-md-4">
                                         <div className="p-3 rounded-3 bg-white border shadow-sm h-100">
@@ -387,15 +341,13 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                     </div>
                                 </div>
 
-                                {/* وصف العرض */}
                                 <div className="position-relative p-4 rounded-4" style={{ backgroundColor: '#f8f9fa' }}>
                                     <p className="text-dark fw-semibold fs-5 mb-0 position-relative z-1" style={{ lineHeight: '1.8' }}>
                                         {offer.details}
                                     </p>
                                 </div>
 
-                                {/* المراحل الزمنية */}
-                                {offer.stages && (
+                                {offer.stages && offer.stages.length > 0 && (
                                     <div className="mt-4">
                                         <h6 className="fw-bold mb-3 text-muted">المراحل الزمنية:</h6>
                                         <div className="d-flex flex-wrap gap-2">
@@ -408,11 +360,9 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                     </div>
                                 )}
 
-                                {/* تاريخ التقديم وأزرار الإجراءات */}
                                 <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                                     <span className="text-muted small fw-bold">تاريخ العرض: {offer.offerDate}</span>
                                     <div className="d-flex gap-2 flex-wrap">
-                                        {/* زر عرض التفاصيل - يظهر دائماً */}
                                         <button 
                                             className="btn fw-bold px-4 py-2 rounded-pill shadow-sm d-flex align-items-center gap-2"
                                             style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '16px' }}
@@ -422,11 +372,21 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                                         </button>
                                         {offer.status === 'pending' && (
                                             <>
-                                                <button className="btn btn-success fw-bold px-4 py-2 rounded-pill shadow-sm" style={{ fontSize: '16px' }}>
-                                                    <FaCheckCircle className="me-1" /> قبول العرض
+                                                <button 
+                                                    className="btn btn-success fw-bold px-4 py-2 rounded-pill shadow-sm" 
+                                                    style={{ fontSize: '16px' }}
+                                                    onClick={() => handleAcceptOffer(offer.id)}
+                                                    disabled={actionLoading}
+                                                >
+                                                    <FaCheckCircle className="me-1" /> {actionLoading ? 'جاري القبول...' : 'قبول العرض'}
                                                 </button>
-                                                <button className="btn btn-outline-danger fw-bold px-4 py-2 rounded-pill" style={{ fontSize: '16px' }}>
-                                                    <FaTimesCircle className="me-1" /> رفض
+                                                <button 
+                                                    className="btn btn-outline-danger fw-bold px-4 py-2 rounded-pill" 
+                                                    style={{ fontSize: '16px' }}
+                                                    onClick={() => handleRejectOffer(offer.id)}
+                                                    disabled={actionLoading}
+                                                >
+                                                    <FaTimesCircle className="me-1" /> {actionLoading ? 'جاري الرفض...' : 'رفض'}
                                                 </button>
                                             </>
                                         )}
@@ -452,7 +412,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         );
     }
 
-    // عرض تفاصيل المشروع (Tracking Details)
+    // 3. واجهة تفاصيل المشروع (Tracking Details)
     if (trackingView === 'details' && selectedProject) {
         return (
             <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white">
@@ -494,27 +454,27 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                         </div>
                     </div>
                 </div>
-                {selectedProject.milestones && (
+                {selectedProject.milestones && selectedProject.milestones.length > 0 && (
                     <>
                         <h4 className="fw-bold mb-4 border-bottom pb-3" style={{ color: '#1b2a47' }}>الجدول الزمني وتقارير الإنجاز</h4>
                         <div className="position-relative me-3 border-start border-2 border-warning pb-4 pe-4" style={{ borderColor: selectedProject.progress === 100 ? '#10b981' : '#ff8a00' }}>
-                            {selectedProject.milestones?.map((milestone, index) => (
+                            {selectedProject.milestones.map((milestone, index) => (
                                 <div key={index} className="mb-5 position-relative px-4">
                                     <div 
                                         className="position-absolute d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
                                         style={{ 
                                             width: '40px', height: '40px', 
                                             right: '-21px', top: '0',
-                                            backgroundColor: milestone.completed ? '#10b981' : '#cbd5e1'
+                                            backgroundColor: milestone.completed || milestone.status === 'completed' ? '#10b981' : '#cbd5e1'
                                         }}
                                     >
-                                        {milestone.completed ? <FaCheck /> : index + 1}
+                                        {milestone.completed || milestone.status === 'completed' ? <FaCheck /> : index + 1}
                                     </div>
-                                    <h5 className={`fw-bold mb-2 ${milestone.completed ? 'text-success' : 'text-muted'}`}>
-                                        {milestone.name}
-                                        {milestone.completed && <FaCheckCircle className="me-2 text-success" />}
+                                    <h5 className={`fw-bold mb-2 ${milestone.completed || milestone.status === 'completed' ? 'text-success' : 'text-muted'}`}>
+                                        {milestone.name || milestone.title}
+                                        {(milestone.completed || milestone.status === 'completed') && <FaCheckCircle className="me-2 text-success" />}
                                     </h5>
-                                    {!milestone.completed && (
+                                    {(!milestone.completed && milestone.status !== 'completed') && (
                                         <div className="progress" style={{ height: '6px', borderRadius: '10px' }}>
                                             <div className="progress-bar bg-secondary" style={{ width: '0%' }}></div>
                                         </div>
@@ -548,7 +508,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         );
     }
 
-    // واجهة تقييم المشروع (نجوم + تعليق لمزود الخدمة)
+    // 4. واجهة تقييم المشروع
     if (trackingView === 'rate' && selectedProject) {
         return (
             <ProjectRatingForm
@@ -558,7 +518,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         );
     }
 
-    // نموذج تقديم شكوى
+    // 5. واجهة نموذج تقديم شكوى
     if (trackingView === 'complaint' && selectedProject) {
         return (
             <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mx-auto" style={{ maxWidth: '800px' }}>
@@ -623,7 +583,7 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
         );
     }
 
-    // نموذج تعديل المشروع
+    // 6. واجهة تعديل المشروع
     if (trackingView === 'edit' && selectedProject) {
         return (
             <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mx-auto" style={{ maxWidth: '100%' }}>
@@ -722,7 +682,9 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                         </div>
                         <div className="col-12 mt-5 text-center">
                             <div className="d-flex justify-content-center gap-4 flex-wrap">
-                                <button type="submit" className="btn fw-bold py-3 px-5 shadow d-flex align-items-center gap-2" style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '24px', borderRadius: '15px' }}><FaSave /> حفظ التعديلات وإعادة الطرح</button>
+                                <button type="submit" disabled={actionLoading} className="btn fw-bold py-3 px-5 shadow d-flex align-items-center gap-2" style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '24px', borderRadius: '15px' }}>
+                                    {actionLoading ? <FaSpinner className="fa-spin" /> : <FaSave />} حفظ التعديلات وإعادة الطرح
+                                </button>
                                 <button type="button" className="btn fw-bold py-3 px-5 shadow d-flex align-items-center gap-2" style={{ backgroundColor: '#e2e8f0', color: '#1b2a47', fontSize: '24px', borderRadius: '15px' }} onClick={cancelEdit}><FaTimes /> إلغاء</button>
                             </div>
                         </div>
@@ -766,128 +728,135 @@ const OffersTab = ({ setActiveTab, setTargetTrackingProject }) => {
                 </button>
             </div>
 
-            <div className="row g-4">
-                {projects.length > 0 ? projects.map(project => (
-                    <div key={project.id} className="col-12">
-                        <div className={`card border-0 shadow-sm rounded-4 p-4 bg-white border-end border-4 ${project.progress === 100 ? 'border-success' : project.progress === 0 ? 'border-primary' : 'border-warning'}`}>
-                            <div className="row align-items-center">
-                                <div className="col-md-8">
-                                    <div className="d-flex justify-content-between align-items-start mb-2">
-                                        <h4 className="fw-bold mb-0" style={{ color: '#1b2a47' }}>{project.projectTitle}</h4>
-                                        <span className={`badge ${project.progress === 100 ? 'bg-success' : project.progress === 0 ? 'bg-primary' : 'bg-warning text-dark'} px-3 py-2 rounded-pill fw-bold fs-6 me-2`}>
-                                            {project.progress === 0 && project.offersCount !== undefined ? `${project.offersCount} عروض` : project.status}
-                                        </span>
+            {loading ? (
+                 <div className="text-center py-5">
+                    <FaSpinner className="fa-spin text-primary mb-3" size={50} />
+                    <h4 className="text-muted fw-bold">جاري تحميل مشاريعك...</h4>
+                </div>
+            ) : (
+                <div className="row g-4">
+                    {projects.length > 0 ? projects.map(project => (
+                        <div key={project.id} className="col-12">
+                            <div className={`card border-0 shadow-sm rounded-4 p-4 bg-white border-end border-4 ${project.progress === 100 ? 'border-success' : project.progress === 0 ? 'border-primary' : 'border-warning'}`}>
+                                <div className="row align-items-center">
+                                    <div className="col-md-8">
+                                        <div className="d-flex justify-content-between align-items-start mb-2">
+                                            <h4 className="fw-bold mb-0" style={{ color: '#1b2a47' }}>{project.projectTitle}</h4>
+                                            <span className={`badge ${project.progress === 100 ? 'bg-success' : project.progress === 0 ? 'bg-primary' : 'bg-warning text-dark'} px-3 py-2 rounded-pill fw-bold fs-6 me-2`}>
+                                                {project.progress === 0 && project.offersCount !== undefined ? `${project.offersCount} عروض` : project.status}
+                                            </span>
+                                        </div>
+                                        {project.providerName && (
+                                            <div className="d-flex align-items-center gap-3 mb-2">
+                                                <div className="bg-light rounded-circle d-flex align-items-center justify-content-center fw-bold text-secondary border shadow-sm" style={{ width: '60px', height: '60px', fontSize: '20px' }}>
+                                                    <FaUserTie />
+                                                </div>
+                                                <div>
+                                                    <h5 className="fw-bold mb-1 text-dark">{project.providerName}</h5>
+                                                    <span className="badge bg-secondary bg-opacity-10 text-dark px-3 py-1 rounded-pill fw-bold border">{project.providerType}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <p className="text-muted fw-semibold mb-0 mt-2" style={{ lineHeight: '1.8' }}>{project.details}</p>
+                                        {project.progress === 0 && project.daysRemaining !== undefined && (
+                                            <div className="d-flex gap-3 mt-3 flex-wrap">
+                                                {project.governorate && <span className="text-muted fw-semibold"><FaMapMarkerAlt className="ms-1 text-primary" />{project.governorate}</span>}
+                                                {project.area && <span className="text-muted fw-semibold"><FaBuilding className="ms-1 text-primary" />{project.area} م²</span>}
+                                                <span className="text-muted fw-semibold"><FaCalendarAlt className="ms-1 text-primary" />متبقي {project.daysRemaining} أيام</span>
+                                            </div>
+                                        )}
+                                        {project.progress > 0 && (
+                                            <div className="mt-3">
+                                                <div className="d-flex justify-content-between align-items-center mb-1">
+                                                    <span className="text-muted small fw-bold">نسبة الإنجاز</span>
+                                                    <span className="fw-bold" style={{ color: project.progress === 100 ? '#10b981' : '#ff8a00' }}>{project.progress}%</span>
+                                                </div>
+                                                <div className="progress" style={{ height: '10px', borderRadius: '10px' }}>
+                                                    <div className={`progress-bar ${project.progress === 100 ? 'bg-success' : 'bg-warning progress-bar-striped progress-bar-animated'}`} style={{ width: `${project.progress}%` }}></div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    {project.providerName && (
-                                        <div className="d-flex align-items-center gap-3 mb-2">
-                                            <div className="bg-light rounded-circle d-flex align-items-center justify-content-center fw-bold text-secondary border shadow-sm" style={{ width: '60px', height: '60px', fontSize: '20px' }}>
-                                                <FaUserTie />
-                                            </div>
-                                            <div>
-                                                <h5 className="fw-bold mb-1 text-dark">{project.providerName}</h5>
-                                                <span className="badge bg-secondary bg-opacity-10 text-dark px-3 py-1 rounded-pill fw-bold border">{project.providerType}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <p className="text-muted fw-semibold mb-0 mt-2" style={{ lineHeight: '1.8' }}>{project.details}</p>
-                                    {project.progress === 0 && project.daysRemaining !== undefined && (
-                                        <div className="d-flex gap-3 mt-3 flex-wrap">
-                                            {project.governorate && <span className="text-muted fw-semibold"><FaMapMarkerAlt className="ms-1 text-primary" />{project.governorate}</span>}
-                                            {project.area && <span className="text-muted fw-semibold"><FaBuilding className="ms-1 text-primary" />{project.area} م²</span>}
-                                            <span className="text-muted fw-semibold"><FaCalendarAlt className="ms-1 text-primary" />متبقي {project.daysRemaining} أيام</span>
-                                        </div>
-                                    )}
-                                    {project.progress > 0 && (
-                                        <div className="mt-3">
-                                            <div className="d-flex justify-content-between align-items-center mb-1">
-                                                <span className="text-muted small fw-bold">نسبة الإنجاز</span>
-                                                <span className="fw-bold" style={{ color: project.progress === 100 ? '#10b981' : '#ff8a00' }}>{project.progress}%</span>
-                                            </div>
-                                            <div className="progress" style={{ height: '10px', borderRadius: '10px' }}>
-                                                <div className={`progress-bar ${project.progress === 100 ? 'bg-success' : 'bg-warning progress-bar-striped progress-bar-animated'}`} style={{ width: `${project.progress}%` }}></div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="col-md-4 text-md-end text-start mt-4 mt-md-0 border-start ps-md-4 d-flex flex-column justify-content-center">
-                                    {project.progress === 0 && project.offersCount !== undefined ? (
-                                        <>
-                                            <p className="text-muted fw-bold mb-1"><FaRegClock className="me-1" /> تاريخ الطرح</p>
-                                            <h5 className="fw-bold mb-3">{project.datePosted}</h5>
-                                            <p className="text-muted fw-bold mb-1"><FaFileContract className="me-1" /> المدة</p>
-                                            <h5 className="fw-bold mb-3">{project.duration}</h5>
-                                            <div className="d-flex flex-column gap-2">
-                                                <button 
-                                                    className="btn fw-bold py-2 rounded-pill shadow-sm w-100 d-flex align-items-center justify-content-center gap-2" 
-                                                    style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '18px' }}
-                                                    onClick={() => viewProjectOffers(project)}
-                                                >
-                                                    <FaEye /> عرض العروض المستلمة
-                                                </button>
-                                                <button 
-                                                    className="btn fw-bold py-2 rounded-pill shadow-sm w-100 d-flex align-items-center justify-content-center gap-2" 
-                                                    style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '18px' }}
-                                                    onClick={() => startEdit(project)}
-                                                >
-                                                    <FaEdit /> تعديل المشروع
-                                                </button>
-                                                <button 
-                                                    className="btn fw-bold py-2 rounded-pill shadow-sm w-100 d-flex align-items-center justify-content-center gap-2" 
-                                                    style={{ backgroundColor: '#dc3545', color: 'white', fontSize: '18px' }}
-                                                    onClick={() => handleDelete(project.id)}
-                                                >
-                                                    <FaTrash /> حذف المشروع
-                                                </button>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <p className="text-muted fw-bold mb-1"><FaRegClock className="me-1" /> {project.progress === 100 ? 'المدة المستغرقة' : 'مدة التنفيذ'}</p>
-                                            <h5 className="fw-bold mb-3">{project.duration}</h5>
-                                            <p className="text-muted fw-bold mb-1"><FaMoneyBillWave className="me-1" /> {project.progress === 100 ? 'القيمة النهائية' : 'قيمة العرض المعتمد'}</p>
-                                            <h3 className={`fw-bold mb-4 ${project.progress === 100 ? 'text-secondary' : ''}`} style={{ color: project.progress === 100 ? '#6c757d' : '#ff8a00' }}>{project.price} ر.س</h3>
-                                            {project.progress < 100 ? (
-                                                <button 
-                                                    className="btn fw-bold py-2 rounded-pill shadow-sm w-100" 
-                                                    style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '18px' }} 
-                                                    onClick={() => { 
-                                                        setTargetTrackingProject(project); 
-                                                        setActiveTab('tracking'); 
-                                                    }}
-                                                >
-                                                    <FaTruck className="me-2" /> متابعة تفاصيل المشروع
-                                                </button>
-                                            ) : (
-                                                <button 
-                                                    className="btn fw-bold py-2 rounded-pill shadow-sm w-100" 
-                                                    style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '18px' }} 
-                                                    onClick={() => { 
-                                                        setTargetTrackingProject(project); 
-                                                        setActiveTab('tracking'); 
-                                                    }}
-                                                >
-                                                    <FaCheckCircle className="me-2" /> عرض التفاصيل والتقييم
-                                                </button>
-                                            )}
-                                            <div className="text-muted small fw-semibold mt-3 text-center">
-                                                {project.progress === 100 ? `تاريخ الانتهاء: ${project.dateCompleted}` : `تاريخ اعتماد العرض: ${project.dateAccepted}`}
-                                            </div>
-                                        </>
-                                    )}
+                                    <div className="col-md-4 text-md-end text-start mt-4 mt-md-0 border-start ps-md-4 d-flex flex-column justify-content-center">
+                                        {project.progress === 0 ? (
+                                            <>
+                                                <p className="text-muted fw-bold mb-1"><FaRegClock className="me-1" /> تاريخ الطرح</p>
+                                                <h5 className="fw-bold mb-3">{project.datePosted}</h5>
+                                                <p className="text-muted fw-bold mb-1"><FaFileContract className="me-1" /> الميزانية التقديرية</p>
+                                                <h5 className="fw-bold mb-3 text-primary">{project.price}</h5>
+                                                <div className="d-flex flex-column gap-2">
+                                                    <button 
+                                                        className="btn fw-bold py-2 rounded-pill shadow-sm w-100 d-flex align-items-center justify-content-center gap-2" 
+                                                        style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '18px' }}
+                                                        onClick={() => viewProjectOffers(project)}
+                                                    >
+                                                        <FaEye /> عرض العروض ({project.offersCount})
+                                                    </button>
+                                                    <button 
+                                                        className="btn fw-bold py-2 rounded-pill shadow-sm w-100 d-flex align-items-center justify-content-center gap-2" 
+                                                        style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '18px' }}
+                                                        onClick={() => startEdit(project)}
+                                                    >
+                                                        <FaEdit /> تعديل المشروع
+                                                    </button>
+                                                    <button 
+                                                        className="btn fw-bold py-2 rounded-pill shadow-sm w-100 d-flex align-items-center justify-content-center gap-2" 
+                                                        style={{ backgroundColor: '#dc3545', color: 'white', fontSize: '18px' }}
+                                                        onClick={() => handleDelete(project.id)}
+                                                    >
+                                                        <FaTrash /> حذف المشروع
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-muted fw-bold mb-1"><FaRegClock className="me-1" /> {project.progress === 100 ? 'المدة المستغرقة' : 'مدة التنفيذ'}</p>
+                                                <h5 className="fw-bold mb-3">{project.duration}</h5>
+                                                <p className="text-muted fw-bold mb-1"><FaMoneyBillWave className="me-1" /> {project.progress === 100 ? 'القيمة النهائية' : 'قيمة العرض المعتمد'}</p>
+                                                <h3 className={`fw-bold mb-4 ${project.progress === 100 ? 'text-secondary' : ''}`} style={{ color: project.progress === 100 ? '#6c757d' : '#ff8a00' }}>{project.price} ر.س</h3>
+                                                {project.progress < 100 ? (
+                                                    <button 
+                                                        className="btn fw-bold py-2 rounded-pill shadow-sm w-100" 
+                                                        style={{ backgroundColor: '#1b2a47', color: 'white', fontSize: '18px' }} 
+                                                        onClick={() => { 
+                                                            setTargetTrackingProject(project); 
+                                                            setActiveTab('tracking'); 
+                                                        }}
+                                                    >
+                                                        <FaTruck className="me-2" /> متابعة تفاصيل المشروع
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        className="btn fw-bold py-2 rounded-pill shadow-sm w-100" 
+                                                        style={{ backgroundColor: '#ff8a00', color: 'white', fontSize: '18px' }} 
+                                                        onClick={() => { 
+                                                            setTargetTrackingProject(project); 
+                                                            setActiveTab('tracking'); 
+                                                        }}
+                                                    >
+                                                        <FaCheckCircle className="me-2" /> عرض التفاصيل والتقييم
+                                                    </button>
+                                                )}
+                                                <div className="text-muted small fw-semibold mt-3 text-center">
+                                                    {project.progress === 100 ? `تاريخ الانتهاء: ${project.dateCompleted}` : `تاريخ البدء: ${project.dateAccepted}`}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )) : (
-                    <div className="col-12 text-center py-5">
-                        <h4 className="text-muted fw-bold">
-                            {offerStatus === 'pending' ? 'لا توجد مشاريع قيد الانتظار حالياً.' 
-                            : offerStatus === 'ongoing' ? 'لا توجد مشاريع قيد التنفيذ حالياً.' 
-                            : 'لا يوجد أرشيف لمشاريع منتهية.'}
-                        </h4>
-                    </div>
-                )}
-            </div>
+                    )) : (
+                        <div className="col-12 text-center py-5">
+                            <h4 className="text-muted fw-bold">
+                                {offerStatus === 'pending' ? 'لا توجد مشاريع قيد الانتظار حالياً.' 
+                                : offerStatus === 'ongoing' ? 'لا توجد مشاريع قيد التنفيذ حالياً.' 
+                                : 'لا يوجد أرشيف لمشاريع منتهية.'}
+                            </h4>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
