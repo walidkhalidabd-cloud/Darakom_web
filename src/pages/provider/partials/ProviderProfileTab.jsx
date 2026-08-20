@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { 
   FaUserEdit, FaStar, FaHardHat, FaShieldAlt, 
   FaMapMarkerAlt, FaPhone, FaEnvelope, FaBriefcase, FaPen,
-  FaSave, FaCamera, FaSpinner, FaTools,
-  FaExclamationTriangle, FaBuilding,
-  FaPlusCircle, FaTrash, FaGlobeAsia, FaIdCard,
-  FaThumbsUp, FaComment, FaShare
+  FaSave, FaCamera, FaSpinner, FaBuilding,
+  FaExclamationTriangle,
+  FaPlusCircle, FaTrash, FaGlobeAsia, FaIdCard, FaTimes
 } from 'react-icons/fa';
 import { 
   fetchProfile, updateProfile, 
@@ -21,13 +20,22 @@ const ProviderProfileTab = () => {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   
+  // مصفوفة المحافظات الـ 14 المطابقة لقاعدة البيانات
+  const syrianGovernorates = [
+    { id: 1, name: 'دمشق' }, { id: 2, name: 'حلب' }, { id: 3, name: 'ريف دمشق' },
+    { id: 4, name: 'درعا' }, { id: 5, name: 'السويداء' }, { id: 6, name: 'القنيطرة' },
+    { id: 7, name: 'اللاذقية' }, { id: 8, name: 'طرطوس' }, { id: 9, name: 'إدلب' },
+    { id: 10, name: 'حماة' }, { id: 11, name: 'الحسكة' }, { id: 12, name: 'الرقة' },
+    { id: 13, name: 'دير الزور' }, { id: 14, name: 'حمص' }
+  ];
+
   const [profileData, setProfileData] = useState({
     first_name: '', last_name: '', email: '', phone: '', address: '',
     province_id: 1, 
     provider_type: 'غير محدد', 
     work_area: '', 
     syndicate_number: '',
-    experience_years: 0, // 👈 تم تجهيز الحقل
+    experience_years: 0, 
     bio: '',
     services: [], avatar_url: null, 
     projects_completed: 0, active_projects: 0, average_rating: 0
@@ -37,7 +45,6 @@ const ProviderProfileTab = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newProject, setNewProject] = useState({ description: '', images: [] });
   const [uploadedImages, setUploadedImages] = useState([]);
-  const [likedPosts, setLikedPosts] = useState(new Set());
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -53,7 +60,9 @@ const ProviderProfileTab = () => {
         fetchPreviousWorks().catch(() => ({ data: { data: [] } })) 
       ]);
 
-      const user = profileRes.data?.data || profileRes.data;
+      let user = profileRes.data?.data || profileRes.data || {};
+      if (user.data) user = user.data; 
+
       const profile = user.profile || {};
 
       let cleanWorkArea = profile.work_area || '';
@@ -71,10 +80,10 @@ const ProviderProfileTab = () => {
         provider_type: profile.role || 'غير محدد', 
         work_area: cleanWorkArea,
         syndicate_number: profile.syndicate_number || '',
-        experience_years: profile.experience || 0, // 👈 جلب سنوات الخبرة من الباك
+        experience_years: profile.experience_years ?? profile.experience ?? 0,
         bio: profile.bio || '',
         services: [], 
-        avatar_url: user.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : null,
+        avatar_url: user.avatar ? user.avatar : null,
         projects_completed: 0, 
         active_projects: 0, 
         average_rating: 0 
@@ -112,9 +121,9 @@ const ProviderProfileTab = () => {
         province_id: profileData.province_id,
         address: profileData.address || 'سوريا',
         bio: profileData.bio,
-        work_area: profileData.work_area,
+        work_area: profileData.work_area || profileData.provider_type, // إرسال التخصص الأساسي كقيمة احتياطية للباك إند
         syndicate_number: profileData.syndicate_number,
-        experience_years: profileData.experience_years // 👈 الآن سيتم إرسال سنوات الخبرة للباك إند
+        experience_years: profileData.experience_years 
       };
 
       await updateProfile(payload);
@@ -163,18 +172,6 @@ const ProviderProfileTab = () => {
     } catch (err) {
       showToast('error', '❌ فشل عملية الحذف.');
     }
-  };
-
-  const toggleLike = (id) => {
-    setLikedPosts(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
-      return newSet;
-    });
-    setProjects(prev => prev.map(p => 
-      p.id === id ? { ...p, likes: p.likes + (likedPosts.has(id) ? -1 : 1) } : p
-    ));
   };
 
   if (loading) {
@@ -316,12 +313,10 @@ const ProviderProfileTab = () => {
                   <label className="form-label fw-bold text-dark"><FaMapMarkerAlt className="ms-1 text-danger" /> المحافظة</label>
                   <select className={`form-select form-control-custom ${isEditing ? 'border-warning' : ''}`}
                     value={profileData.province_id} onChange={(e) => handleChange('province_id', e.target.value)} disabled={!isEditing} required>
-                    <option value="1">دمشق</option>
-                    <option value="2">ريف دمشق</option>
-                    <option value="3">حلب</option>
-                    <option value="4">حمص</option>
-                    <option value="5">اللاذقية</option>
-                    <option value="6">طرطوس</option>
+                    <option value="">اختر المحافظة...</option>
+                    {syrianGovernorates.map(gov => (
+                      <option key={gov.id} value={gov.id}>{gov.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -329,16 +324,11 @@ const ProviderProfileTab = () => {
                     <h5 className="fw-bold mb-3 pb-2 border-bottom text-muted">التفاصيل المهنية</h5>
                 </div>
 
+                {/* تم تعديل التخطيط ليكون الحقول الثلاثة في سطر واحد */}
                 <div className="col-md-4">
                     <label className="form-label fw-bold text-dark">التخصص الأساسي</label>
                     <input type="text" className="form-control form-control-custom bg-light text-primary fw-bold" 
                         value={profileData.provider_type} disabled />
-                </div>
-
-                <div className="col-md-4">
-                    <label className="form-label fw-bold text-dark">مجال العمل الدقيق</label>
-                    <input type="text" className={`form-control form-control-custom ${isEditing ? 'border-warning' : ''}`} placeholder="مثال: شركة الأفق..."
-                        value={profileData.work_area} onChange={(e) => handleChange('work_area', e.target.value)} disabled={!isEditing} />
                 </div>
                 
                 <div className="col-md-4">
@@ -347,9 +337,8 @@ const ProviderProfileTab = () => {
                         value={profileData.syndicate_number} onChange={(e) => handleChange('syndicate_number', e.target.value)} disabled={!isEditing} />
                 </div>
 
-                {/* 👇 حقل سنوات الخبرة 👇 */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold text-dark">سنوات الخبرة العملية</label>
+                <div className="col-md-4">
+                  <label className="form-label fw-bold text-dark">سنوات الخبرة</label>
                   <div className="input-group shadow-sm">
                     <input 
                       type="number" 
@@ -434,7 +423,6 @@ const ProviderProfileTab = () => {
 
         <div className="d-flex flex-column gap-5">
           {projects.length > 0 ? projects.map(project => {
-            const isLiked = likedPosts.has(project.id);
             return (
               <div key={project.id} className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
                 <div className="d-flex align-items-center justify-content-between p-4 pb-0">

@@ -13,13 +13,21 @@ const ProfileTab = () => {
 
   // مصفوفة المحافظات السورية مع IDs لتتوافق مع الباك إند
   const syrianGovernorates = [
-    { id: 1, name: 'دمشق' }, { id: 2, name: 'ريف دمشق' }, { id: 3, name: 'حلب' },
-    { id: 4, name: 'حمص' }, { id: 5, name: 'حماة' }, { id: 6, name: 'اللاذقية' },
-    { id: 7, name: 'طرطوس' }, { id: 8, name: 'إدلب' }, { id: 9, name: 'الرقة' },
-    { id: 10, name: 'دير الزور' }, { id: 11, name: 'الحسكة' }, { id: 12, name: 'درعا' },
-    { id: 13, name: 'السويداء' }, { id: 14, name: 'القنيطرة' }
+    { id: 1, name: 'دمشق' },
+    { id: 2, name: 'حلب' },
+    { id: 3, name: 'ريف دمشق' },
+    { id: 4, name: 'درعا' },
+    { id: 5, name: 'السويداء' },
+    { id: 6, name: 'القنيطرة' },
+    { id: 7, name: 'اللاذقية' },
+    { id: 8, name: 'طرطوس' },
+    { id: 9, name: 'إدلب' },
+    { id: 10, name: 'حماة' },
+    { id: 11, name: 'الحسكة' },
+    { id: 12, name: 'الرقة' },
+    { id: 13, name: 'دير الزور' },
+    { id: 14, name: 'حمص' }
   ];
-
   const [formData, setFormData] = useState({
     first_name: '', 
     last_name: '', 
@@ -29,28 +37,27 @@ const ProfileTab = () => {
     province_id: '', 
     bio: ''
   });
-
+ const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
         const res = await fetchClientProfile();
-        // معالجة تداخل البيانات القادمة من UserResource
+        // معالجة البيانات القادمة من UserResource
         let data = res.data?.data || res.data || {};
-        if (data.data) data = data.data;
-
-        // 💡 ذكاء اصطناعي: إذا لم يرسل الباك إند first_name و last_name منفصلين، نقوم بفصل حقل name المدمج
-        const fName = data.first_name || data.firstName || (data.name ? data.name.split(' ')[0] : '');
-        const lName = data.last_name || data.lastName || (data.name && data.name.includes(' ') ? data.name.substring(data.name.indexOf(' ') + 1) : '');
-
+        
+        // ربط مباشر مع أسماء المتغيرات القادمة من الباك إند
         setFormData({
-          first_name: fName,
-          last_name: lName,
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
           email: data.email || '',
           phone: data.phone || '',
           address: data.address || '',
-          province_id: data.province?.id || data.province_id || '',
-          bio: data.profile?.bio || data.bio || ''
+          province_id: data.province_id || '',
+          bio: data.profile?.bio || ''
         });
       } catch (err) {
         console.error("Error fetching profile", err);
@@ -72,10 +79,7 @@ const ProfileTab = () => {
     } finally { setSaving(false); }
   };
 
-  const showToast = (type, message) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+ 
 
   const handleLogout = () => {
     clearAuth();
@@ -90,7 +94,7 @@ const ProfileTab = () => {
     );
   }
 
-  // تجنب ظهور "undefined undefined" إذا كان الاسم فارغاً لسبب ما
+  // دمج الاسم للعرض في الواجهة
   const displayName = (formData.first_name || formData.last_name) 
         ? `${formData.first_name} ${formData.last_name}` 
         : 'مستخدم داركم';

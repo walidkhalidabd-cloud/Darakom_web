@@ -36,6 +36,7 @@ export const forgotPassword = (data) => {
 export const resetPassword = (data) => {
     return apiReq.post('/reset-password', data);
 };
+
 export default {
   fetchProvinces,
   fetchDocumentTypes,

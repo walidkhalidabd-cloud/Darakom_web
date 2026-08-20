@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FaUserAlt, FaHardHat, FaPlus, FaTrash } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import registerBg from '../assets/register-bg.jpg';
-// تأكد من استيراد fetchDocumentTypes
 import { register, fetchProvinces, fetchDocumentTypes } from '../services/api/authApi'; 
 import { setAuth, getDashboardPath } from '../services/auth';
 
@@ -17,20 +16,19 @@ const Register = () => {
     const [documentTypesList, setDocumentTypesList] = useState([]); 
     const [loading, setLoading] = useState(false);
 
+    // تم إضافة syndicate_number للحالة
     const [formData, setFormData] = useState({
         first_name: '', last_name: '', phone: '', email: '',
         password: '', password_confirmation: '',
         province_id: '', type: 'client',
-        role_id: '', work_area: ''
+        role_id: '', work_area: '', syndicate_number: ''
     });
 
     const [documents, setDocuments] = useState([]);
 
-    // جلب البيانات عند التحميل (المحافظات وأنواع الوثائق)
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                // جلب المحافظات
                 const provRes = await fetchProvinces();
                 setProvinces(provRes.data?.data || []);
             } catch (err) {
@@ -38,7 +36,6 @@ const Register = () => {
             }
 
             try {
-                // جلب أنواع الوثائق
                 const docTypesRes = await fetchDocumentTypes();
                 setDocumentTypesList(docTypesRes.data?.data || []);
             } catch (err) {
@@ -90,13 +87,16 @@ const Register = () => {
         if (formData.type === 'provider') {
             payload.append('role_id', formData.role_id);
             payload.append('work_area', formData.work_area);
+            if (formData.syndicate_number) {
+                payload.append('syndicate_number', formData.syndicate_number);
+            }
             
             // إضافة الوثائق مع إرسال الـ ID الخاص بنوع الوثيقة
             documents.forEach((doc, index) => {
                 if (doc.file && doc.type) {
                     payload.append(`documents[${index}][file]`, doc.file);
                     payload.append(`documents[${index}][description]`, doc.title || '');
-                    payload.append(`documents[${index}][type]`, doc.type); // إرسال الـ ID ليتوافق مع exists:document_types,id
+                    payload.append(`documents[${index}][type]`, doc.type);
                 }
             });
         }
@@ -110,14 +110,13 @@ const Register = () => {
                 toast.success(res.data?.message || 'تم إنشاء الحساب بنجاح!');
                 navigate(getDashboardPath(data));
             } else {
-                toast.success(res.data?.message || 'تم إنشاء الحساب بنجاح! بانتظار التفعيل.');
+                toast.success(res.data?.message || 'تم إنشاء الحساب بنجاح! بانتظار موافقة الإدارة.');
                 navigate('/login');
             }
         } catch (err) {
-            // التعامل مع أخطاء التحقق القادمة من Laravel
             if (err.response?.status === 422) {
                 const errors = err.response.data.errors;
-                const firstError = Object.values(errors)[0][0]; // جلب أول خطأ
+                const firstError = Object.values(errors)[0][0]; 
                 toast.error(firstError);
             } else {
                 const msg = err.response?.data?.message || 'فشل إنشاء الحساب';
@@ -134,14 +133,12 @@ const Register = () => {
             <div className="card border-0 shadow-lg overflow-hidden" style={{ maxWidth: '1800px', width: '95%', borderRadius: '20px' }}>
                 <div className="row g-0 align-items-stretch">
                     
-                    {/* النصف الأول: نموذج التسجيل */}
                     <div className="col-lg-6 p-4 p-md-5 bg-white">
                         <div className="text-center mb-5">
                             <h2 className="fw-bold" style={{ color: 'var(--primary-color)', fontSize: '40px' }}>إنشاء حساب جديد</h2>
                             <p className="text-muted fw-semibold" style={{ fontSize: '22px' }}>انضم إلى منصة داركم وابدأ رحلتك معنا</p>
                         </div>
 
-                        {/* أزرار التبديل */}
                         <div className="d-flex justify-content-center mb-5 gap-3">
                             <button 
                                 type="button"
@@ -230,16 +227,23 @@ const Register = () => {
                                                 className="form-select p-3 bg-light border" 
                                                 style={{ fontSize: '20px' }}
                                                 value={specialization} 
-                                                onChange={(e) => { setSpecialization(e.target.value); handleChange('work_area', e.target.value); handleChange('role_id', e.target.value); }} 
+                                                onChange={(e) => { 
+                                                    const val = e.target.value;
+                                                    setSpecialization(val); 
+                                                    handleChange('role_id', val);
+                                                    if (val !== '6') {
+                                                        handleChange('work_area', e.target.options[e.target.selectedIndex].text);
+                                                    } else {
+                                                        handleChange('work_area', '');
+                                                    }
+                                                }} 
                                                 required
                                             >
-                                                <option value="">اختر التخصص...</option>
-                                                {/* تأكد من أن هذه الأرقام تتطابق مع معرفات (IDs) الأدوار في جدول roles لديك */}
-                                                <option value="1">مكتب هندسي</option>
-                                                <option value="2">مهندس مدني</option>
-                                                <option value="3">مهندس معماري</option>
+                                                <option value="5">مكتب هندسي</option>
+                                                <option value="3">مهندس مدني</option>
+                                                <option value="2">مهندس معماري</option>
                                                 <option value="4">مهندس استشاري</option>
-                                                <option value="5">مقاول</option>
+                                                <option value="1">مقاول</option>
                                                 <option value="6">حرفي</option>
                                             </select>
                                         </div>
@@ -247,7 +251,13 @@ const Register = () => {
                                         {specialization === '6' ? (
                                             <div className="col-md-6">
                                                 <label className="form-label fw-bold" style={{ color: 'var(--primary-color)', fontSize: '22px' }}>نوع الحرفة</label>
-                                                <select className="form-select p-3 bg-light border" style={{ fontSize: '20px' }} required>
+                                                <select 
+                                                    className="form-select p-3 bg-light border" 
+                                                    style={{ fontSize: '20px' }} 
+                                                    value={formData.work_area}
+                                                    onChange={(e) => handleChange('work_area', e.target.value)}
+                                                    required
+                                                >
                                                     <option value="">اختر الحرفة...</option>
                                                     <option value="فني كهرباء">فني كهرباء</option>
                                                     <option value="فني سباكة">فني سباكة</option>
@@ -259,11 +269,18 @@ const Register = () => {
                                         ) : specialization !== '' ? (
                                             <div className="col-md-6">
                                                 <label className="form-label fw-bold" style={{ color: 'var(--primary-color)', fontSize: '22px' }}>الرقم النقابي / السجل</label>
-                                                <input type="text" className="form-control p-3 bg-light border" style={{ fontSize: '20px' }} placeholder="أدخل رقمك النقابي" required />
+                                                <input 
+                                                    type="text" 
+                                                    className="form-control p-3 bg-light border" 
+                                                    style={{ fontSize: '20px' }} 
+                                                    placeholder="أدخل رقمك النقابي أو السجل" 
+                                                    value={formData.syndicate_number}
+                                                    onChange={(e) => handleChange('syndicate_number', e.target.value)}
+                                                    required 
+                                                />
                                             </div>
                                         ) : null}
 
-                                        {/* قسم الوثائق بعد ربطه بـ DB */}
                                         <div className="col-12 mt-4">
                                             <div className="d-flex align-items-center justify-content-between p-3 rounded" style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6' }}>
                                                 <span className="fw-bold" style={{ color: 'var(--primary-color)', fontSize: '22px' }}>رفع الوثائق والمرفقات</span>
@@ -289,7 +306,6 @@ const Register = () => {
                                                             required
                                                         >
                                                             <option value="">اختر النوع...</option>
-                                                            {/* عرض أنواع الوثائق القادمة من الباك إند */}
                                                             {documentTypesList.map(type => (
                                                                 <option key={type.id} value={type.id}>{type.name || type.type_name}</option>
                                                             ))}
