@@ -35,8 +35,9 @@ const ProjectsTab = () => {
         const formattedProjects = projectsArray.map(p => {
           
           let mappedStatus = p.status || 'pending';
-          if (mappedStatus === 'new') mappedStatus = 'pending';
-          if (mappedStatus === 'open' || mappedStatus === 'active') mappedStatus = 'approved';
+if (mappedStatus === 'new' || mappedStatus === 'open' || mappedStatus === 'active') {
+    mappedStatus = 'approved';
+}
 
           // قراءة اسم العميل بناءً على علاقات الباك إند
           let clientName = p.client?.name || p.client?.full_name || 'غير معروف';
